@@ -1,0 +1,389 @@
+<script type="text/javascript">var {
+  useState,
+  useEffect
+} = React;
+var {
+  useHistory
+} = ReactRouterDOM;
+var {
+  createPortal
+} = ReactDOM;
+var ONLINE_SHOP_OPTIONS = ["True", "Studio7", "BaNaNa", "Dtac"];
+var PROVINCE_CACHE_KEY = "thai_province_data";
+var PROVINCE_API_URL = "https://raw.githubusercontent.com/kongvut/thai-province-data/refs/heads/master/api/latest/province.json";
+var SlotsList = ({
+  slots,
+  eventId,
+  slotBookId,
+  interviewId,
+  eventName,
+  eventJobType,
+  eventType,
+  date,
+  originalProvince,
+  originalShop,
+  user,
+  onClickLogin
+}) => {
+  const isEditMode = !!slotBookId;
+  const history = useHistory();
+  const [modalOpen, setModalOpen] = useState(false);
+  const [selectedSlot, setSelectedSlot] = useState(null);
+  const [selectedShop, setSelectedShop] = useState("");
+  const [selectedProvince, setSelectedProvince] = useState("");
+  const [provinceOptions, setProvinceOptions] = useState([]);
+  const [isLoadingProvinces, setIsLoadingProvinces] = useState(false);
+  const [expandedSlotKey, setExpandedSlotKey] = useState(null);
+
+  // Fixes BE year double-add bug: "2569-05-15" → toLocaleDateString("th-TH") would give 3112
+  const toThaiDateStr = dateStr => {
+    const d = new Date(dateStr);
+    if (d.getFullYear() > 2400) d.setFullYear(d.getFullYear() - 543);
+    return d.toLocaleString("th-TH", {
+      year: "numeric",
+      month: "long",
+      day: "numeric"
+    });
+  };
+  const fetchProvinces = async () => {
+    const cached = sessionStorage.getItem(PROVINCE_CACHE_KEY);
+    if (cached) {
+      setProvinceOptions(JSON.parse(cached));
+      return;
+    }
+    setIsLoadingProvinces(true);
+    try {
+      const res = await fetch(PROVINCE_API_URL);
+      const data = await res.json();
+      const names = data.map(p => p.name_th).filter(Boolean).sort((a, b) => a.localeCompare(b, "th"));
+      sessionStorage.setItem(PROVINCE_CACHE_KEY, JSON.stringify(names));
+      setProvinceOptions(names);
+    } catch (err) {
+      console.error("Failed to fetch province data:", err);
+    } finally {
+      setIsLoadingProvinces(false);
+    }
+  };
+  useEffect(() => {
+    if (eventType === "ONLINE" && provinceOptions.length === 0) {
+      fetchProvinces();
+    }
+  }, [eventType]);
+
+  // ONLINE: open modal | ONSITE: toggle expand
+  const handleTimeSlotClick = slot => {
+    if (!user) {
+      onClickLogin();
+      return;
+    }
+    if (eventType === "ONLINE") {
+      setSelectedSlot(slot);
+      setSelectedShop("");
+      setSelectedProvince("");
+      setModalOpen(true);
+    } else {
+      const key = `${slot.startTime}-${slot.endTime}`;
+      setExpandedSlotKey(prev => prev === key ? null : key);
+    }
+  };
+
+  // ONLINE modal submit: validate → resolve region → find BU → navigate (create) or update slot (edit)
+  const handleOnlineSubmit = () => {
+    const provinceToUse = isEditMode ? originalProvince : selectedProvince;
+    const shopToUse = isEditMode ? originalShop : selectedShop;
+    if (!shopToUse || !provinceToUse) {
+      Swal.fire({
+        icon: "warning",
+        title: "กรุณากรอกข้อมูลให้ครบ",
+        timer: 2000
+      });
+      return;
+    }
+    const region = getRegionByProvince(provinceToUse);
+    const matchingBu = selectedSlot.bu.find(bu => bu.name === region);
+    if (!matchingBu) {
+      Swal.fire({
+        icon: "error",
+        title: "ไม่พบภูมิภาคนี้",
+        text: `ไม่พบข้อมูลสล็อตสำหรับจังหวัด ${provinceToUse}`
+      });
+      return;
+    }
+    setModalOpen(false);
+    if (isEditMode) {
+      if (slotBookId === matchingBu.slotId) return;
+      Swal.fire({
+        title: "ยืนยันการแก้ไข",
+        text: "คุณต้องการแก้ไขช่วงเวลาใช่หรือไม่?",
+        icon: "warning",
+        showCancelButton: true,
+        confirmButtonText: "ยืนยัน",
+        cancelButtonText: "ยกเลิก"
+      }).then(result => {
+        if (result.isConfirmed) {
+          Swal.fire({
+            title: "กำลังดำเนินการ...",
+            allowOutsideClick: false,
+            didOpen: () => {
+              Swal.showLoading();
+            }
+          });
+          google.script.run.withSuccessHandler(res => {
+            if (res.success === true) {
+              Swal.fire({
+                icon: "success",
+                title: "สำเร็จ",
+                text: res.message,
+                timer: 2000,
+                showConfirmButton: false
+              }).then(() => {
+                history.push("/interview");
+                window.scrollTo(0, 0);
+              });
+            } else {
+              Swal.fire({
+                icon: "error",
+                title: "เกิดข้อผิดพลาด",
+                text: res.message
+              });
+            }
+          }).withFailureHandler(err => {
+            Swal.fire({
+              icon: "error",
+              title: "เกิดข้อผิดพลาด",
+              text: err.message
+            });
+          }).updateSlotInterview({
+            eventId,
+            interviewId,
+            slotId: matchingBu.slotId,
+            shop: shopToUse
+          });
+        }
+      });
+      return;
+    }
+    const params = new URLSearchParams();
+    if (matchingBu.slotId) params.append("slotId", matchingBu.slotId);
+    if (eventId) params.append("eventId", eventId);
+    if (eventJobType) params.append("eventJobType", eventJobType);
+    if (eventName) params.append("eventName", eventName);
+    params.append("buName", region);
+    params.append("shop", shopToUse);
+    params.append("preferredProvince", provinceToUse);
+    if (date) params.append("date", toThaiDateStr(date));
+    params.append("time", `${selectedSlot.startTime}-${selectedSlot.endTime}`);
+    history.push({
+      pathname: "/interview/add",
+      search: params.toString()
+    });
+    window.scrollTo(0, 0);
+  };
+
+  // ONSITE: direct navigation to AddInterviewPage
+  const handleClickAddSlot = (slotId, buName, startTime, endTime) => {
+    if (!user) {
+      onClickLogin();
+      return;
+    }
+    const params = new URLSearchParams();
+    if (slotId) params.append("slotId", slotId);
+    if (eventId) params.append("eventId", eventId);
+    if (eventJobType) params.append("eventJobType", eventJobType);
+    if (eventName) params.append("eventName", eventName);
+    if (buName) params.append("buName", buName);
+    if (date) params.append("date", toThaiDateStr(date));
+    if (startTime && endTime) params.append("time", `${startTime}-${endTime}`);
+    history.push({
+      pathname: "/interview/add",
+      search: params.toString()
+    });
+    window.scrollTo(0, 0);
+  };
+  const handleClickEditSlot = slotId => {
+    if (!user) {
+      onClickLogin();
+      return;
+    }
+    if (slotBookId === slotId) {
+      return;
+    }
+    Swal.fire({
+      title: "ยืนยันการแก้ไข",
+      text: "คุณต้องการแก้ไขช่วงเวลาใช่หรือไม่?",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonText: "ยืนยัน",
+      cancelButtonText: "ยกเลิก"
+    }).then(result => {
+      if (result.isConfirmed) {
+        Swal.fire({
+          title: "กำลังดำเนินการ...",
+          allowOutsideClick: false,
+          didOpen: () => {
+            Swal.showLoading();
+          }
+        });
+        const data = {
+          eventId,
+          interviewId,
+          slotId
+        };
+        google.script.run.withSuccessHandler(res => {
+          if (res.success === true) {
+            Swal.fire({
+              icon: "success",
+              title: "สำเร็จ",
+              text: res.message,
+              timer: 2000,
+              showConfirmButton: false
+            }).then(() => {
+              history.push("/interview");
+              window.scrollTo(0, 0);
+            });
+          } else {
+            Swal.fire({
+              icon: "error",
+              title: "เกิดข้อผิดพลาด",
+              text: res.message
+            });
+          }
+        }).withFailureHandler(err => {
+          Swal.fire({
+            icon: "error",
+            title: "เกิดข้อผิดพลาด",
+            text: err.message
+          });
+        }).updateSlotInterview(data);
+      }
+    });
+  };
+  return /*#__PURE__*/React.createElement("div", {
+    className: "xl:px-20"
+  }, slots.length === 0 ? /*#__PURE__*/React.createElement("div", {
+    className: "w-full flex justify-center text-gray-500 animate-fade-in"
+  }, /*#__PURE__*/React.createElement("p", {
+    className: "text-lg"
+  }, "\u0E44\u0E21\u0E48\u0E1E\u0E1A\u0E02\u0E49\u0E2D\u0E21\u0E39\u0E25\u0E43\u0E19\u0E0A\u0E48\u0E27\u0E07\u0E40\u0E27\u0E25\u0E32\u0E19\u0E35\u0E49")) : /*#__PURE__*/React.createElement("div", {
+    className: "space-y-6 animate-fade-in"
+  }, /*#__PURE__*/React.createElement("p", {
+    className: "text-gray-500 text-left"
+  }, "\u0E17\u0E31\u0E49\u0E07\u0E2B\u0E21\u0E14: ", slots.length, " \u0E0A\u0E48\u0E27\u0E07\u0E40\u0E27\u0E25\u0E32"), /*#__PURE__*/React.createElement("div", {
+    className: "grid grid-cols-1 sm:grid-cols-2 gap-4"
+  }, slots.map(slot => {
+    const slotKey = `${slot.startTime}-${slot.endTime}`;
+    const isExpanded = expandedSlotKey === slotKey;
+    return /*#__PURE__*/React.createElement("div", {
+      key: slotKey,
+      className: "bg-base-100 border border-base-300 rounded-2xl shadow-sm hover:shadow-lg transition-all duration-200 overflow-hidden"
+    }, /*#__PURE__*/React.createElement("div", {
+      onClick: () => handleTimeSlotClick(slot),
+      className: "flex items-center justify-center sm:justify-between px-5 py-4 bg-base-100 cursor-pointer hover:bg-base-200 transition-colors duration-200"
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "flex flex-col items-center sm:items-start"
+    }, /*#__PURE__*/React.createElement("span", {
+      className: "block text-xs text-gray-500"
+    }, "\u0E0A\u0E48\u0E27\u0E07\u0E40\u0E27\u0E25\u0E32\u0E2A\u0E31\u0E21\u0E20\u0E32\u0E29\u0E13\u0E4C"), /*#__PURE__*/React.createElement("span", {
+      className: "text-xl font-medium"
+    }, slot.startTime, " - ", slot.endTime), /*#__PURE__*/React.createElement("div", {
+      className: "flex items-center gap-2 text-sm text-gray-600"
+    }, /*#__PURE__*/React.createElement("span", null, eventType === "ONLINE" ? "คลิกเพื่อเลือก Shop และจังหวัด" : "เลือกภูมิภาค/สาขาที่ต้องการ"))), /*#__PURE__*/React.createElement("div", {
+      className: "hidden sm:flex items-center gap-2 font-medium text-sm p-2 bg-emerald-600 text-white rounded-xl"
+    }, /*#__PURE__*/React.createElement("span", null, eventType === "ONLINE" ? "เลือก Shop / จังหวัด" : "เลือกภูมิภาค/สาขา"), /*#__PURE__*/React.createElement("i", {
+      className: `fa-solid ${eventType === "ONLINE" ? "fa-arrow-right" : isExpanded ? "fa-arrow-up" : "fa-arrow-down"}`
+    }))), eventType !== "ONLINE" && isExpanded && /*#__PURE__*/React.createElement("div", {
+      className: "p-5"
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "grid grid-cols-1 sm:grid-cols-2 gap-3"
+    }, slot.bu.map(bu => {
+      const isBooked = slotBookId === bu.slotId;
+      return /*#__PURE__*/React.createElement("button", {
+        key: bu.slotId,
+        onClick: () => slotBookId ? handleClickEditSlot(bu.slotId) : handleClickAddSlot(bu.slotId, bu.name, slot.startTime, slot.endTime),
+        className: `
+                                group relative flex items-center justify-between p-3 rounded-lg border text-left text-sm transition-all duration-200 cursor-pointer hover:scale-105 active:scale-95
+                                ${isBooked ? "bg-yellow-50 border-2 border-yellow-400 shadow-md" : "bg-base-100 border-2 border-base-300 hover:border-emerald-500 hover:bg-base-200"}
+                              `
+      }, /*#__PURE__*/React.createElement("div", {
+        className: "flex flex-col"
+      }, /*#__PURE__*/React.createElement("div", {
+        className: "flex items-center gap-2"
+      }, /*#__PURE__*/React.createElement("span", {
+        className: `font-medium ${isBooked ? "text-yellow-800" : "text-emerald-600"}`
+      }, bu.name))), isBooked ? /*#__PURE__*/React.createElement("span", {
+        className: "text-sm font-bold text-yellow-700 flex items-center gap-1"
+      }, /*#__PURE__*/React.createElement("i", {
+        className: "fas fa-check-circle"
+      }), " ", "\u0E08\u0E2D\u0E07\u0E41\u0E25\u0E49\u0E27") : /*#__PURE__*/React.createElement("span", {
+        className: "text-gray-400 group-hover:text-emerald-500 transition-colors"
+      }, /*#__PURE__*/React.createElement("i", {
+        className: "fa-solid fa-chevron-right"
+      })), /*#__PURE__*/React.createElement("div", {
+        className: `absolute inset-0 rounded-lg ${isBooked ? "bg-yellow-300 opacity-0" : "bg-emerald-500 opacity-0 group-hover:opacity-5"} transition-opacity duration-200 pointer-events-none`
+      }));
+    }))));
+  }))), eventType === "ONLINE" && modalOpen && createPortal(/*#__PURE__*/React.createElement("dialog", {
+    className: "modal modal-open"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "modal-box rounded-md space-y-4"
+  }, /*#__PURE__*/React.createElement("h3", {
+    className: "text-lg font-semibold"
+  }, isEditMode ? "ยืนยัน Shop" : "เลือก Shop และจังหวัด"), isEditMode ? /*#__PURE__*/React.createElement("div", {
+    className: "form-control w-full"
+  }, /*#__PURE__*/React.createElement("label", {
+    className: "text-sm font-medium text-gray-500 mb-1.5 ml-1 block"
+  }, "Shop \u0E17\u0E35\u0E48\u0E15\u0E49\u0E2D\u0E07\u0E01\u0E32\u0E23"), /*#__PURE__*/React.createElement("input", {
+    type: "text",
+    className: "input input-bordered rounded-md w-full bg-base-200 text-gray-500 cursor-not-allowed",
+    value: originalShop || "-",
+    readOnly: true,
+    disabled: true
+  })) : /*#__PURE__*/React.createElement("div", {
+    className: "form-control w-full"
+  }, /*#__PURE__*/React.createElement("label", {
+    className: "text-sm font-medium text-gray-500 mb-1.5 ml-1 block"
+  }, "Shop \u0E17\u0E35\u0E48\u0E15\u0E49\u0E2D\u0E07\u0E01\u0E32\u0E23"), /*#__PURE__*/React.createElement("select", {
+    className: "select select-bordered rounded-md w-full",
+    value: selectedShop,
+    onChange: e => setSelectedShop(e.target.value)
+  }, /*#__PURE__*/React.createElement("option", {
+    value: "",
+    disabled: true
+  }, "\u0E40\u0E25\u0E37\u0E2D\u0E01 Shop"), ONLINE_SHOP_OPTIONS.map(s => /*#__PURE__*/React.createElement("option", {
+    key: s,
+    value: s
+  }, s)))), isEditMode ? /*#__PURE__*/React.createElement("div", {
+    className: "form-control w-full"
+  }, /*#__PURE__*/React.createElement("label", {
+    className: "text-sm font-medium text-gray-500 mb-1.5 ml-1 block"
+  }, "\u0E08\u0E31\u0E07\u0E2B\u0E27\u0E31\u0E14\u0E17\u0E35\u0E48\u0E15\u0E49\u0E2D\u0E07\u0E01\u0E32\u0E23"), /*#__PURE__*/React.createElement("input", {
+    type: "text",
+    className: "input input-bordered rounded-md w-full bg-base-200 text-gray-500 cursor-not-allowed",
+    value: originalProvince || "-",
+    readOnly: true,
+    disabled: true
+  })) : /*#__PURE__*/React.createElement(SearchableSelect, {
+    label: "\u0E08\u0E31\u0E07\u0E2B\u0E27\u0E31\u0E14\u0E17\u0E35\u0E48\u0E15\u0E49\u0E2D\u0E07\u0E01\u0E32\u0E23",
+    name: "preferredProvince",
+    value: selectedProvince,
+    onChange: e => setSelectedProvince(e.target.value),
+    options: provinceOptions,
+    disabled: isLoadingProvinces,
+    placeholder: isLoadingProvinces ? "กำลังโหลด..." : "พิมพ์เพื่อค้นหาจังหวัด"
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "modal-action"
+  }, /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: "btn btn-ghost rounded-md",
+    onClick: () => setModalOpen(false)
+  }, "\u0E22\u0E01\u0E40\u0E25\u0E34\u0E01"), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: "btn bg-emerald-600 rounded-md text-white hover:bg-emerald-700 transition-colors duration-200",
+    onClick: handleOnlineSubmit
+  }, "\u0E22\u0E37\u0E19\u0E22\u0E31\u0E19"))), /*#__PURE__*/React.createElement("form", {
+    method: "dialog",
+    className: "modal-backdrop"
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: () => setModalOpen(false)
+  }, "close"))), document.body));
+};</script>

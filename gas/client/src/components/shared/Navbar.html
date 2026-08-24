@@ -1,0 +1,258 @@
+<script type="text/javascript">var {
+  Link,
+  useLocation,
+  useHistory
+} = ReactRouterDOM;
+var {
+  useState
+} = React;
+var Navbar = ({
+  user,
+  onLogout,
+  onClickLogin
+}) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [isQueueLoading, setIsQueueLoading] = useState(false);
+  const location = useLocation();
+  const history = useHistory();
+  const navbarMenu = [{
+    name: "หน้าหลัก",
+    path: "/"
+  }, {
+    name: "ลงทะเบียน",
+    path: "/events"
+  }, {
+    name: "ตำแหน่งงานว่าง",
+    path: "/job-hiring"
+  }, user && user.role === "USER" && {
+    name: "เช็คสถานะการสัมภาษณ์",
+    path: "/interview"
+  }, user && (user.role === "ADMIN" || user.role === "SUPERADMIN") && {
+    name: "จัดการระบบ",
+    path: "/system"
+  }, user && user.role === "MANAGER" && {
+    name: "ข้อมูลผู้สมัคร",
+    path: "/manager-candidate"
+  }, user && user.role === "MANAGER" && {
+    name: "ประวัติการดำเนินการ",
+    path: "/manager-transaction"
+  }].filter(Boolean);
+  const isActive = path => {
+    if (path === "/") {
+      return location.pathname === "/";
+    }
+    return location.pathname === path;
+  };
+  const handleMobileClick = () => {
+    handleScrollToTop();
+    setIsOpen(false);
+  };
+  const handleScrollToTop = () => {
+    window.scrollTo(0, 0);
+  };
+
+  // แปลงค่าวันที่ (ISO เช่น "2569-06-26T00:00:00+07:00" หรือ "DD/MM/YYYY") ให้เป็น Date object
+  // รองรับทั้ง ค.ศ. และ พ.ศ. (ถ้าปี > 2400 ให้ตีความเป็น พ.ศ. แล้วแปลงเป็น ค.ศ.)
+  const parseThaiDateNav = (dateStr) => {
+    if (!dateStr) return null;
+    const value = String(dateStr).trim();
+
+    const isoDateOnly = value.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (isoDateOnly) {
+      let year = Number(isoDateOnly[1]);
+      if (year > 2400) year -= 543;
+      return new Date(year, Number(isoDateOnly[2]) - 1, Number(isoDateOnly[3]));
+    }
+
+    const thaiMatch = value.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+    if (thaiMatch) {
+      let year = Number(thaiMatch[3]);
+      if (year > 2400) year -= 543;
+      return new Date(year, Number(thaiMatch[2]) - 1, Number(thaiMatch[1]));
+    }
+
+    const parsed = new Date(value);
+    if (!isNaN(parsed.getTime())) return parsed;
+    return null;
+  };
+
+  // แสดงวันที่แบบไทยเต็ม เช่น "26 มิถุนายน 2569"
+  const formatThaiFullDateNav = (dateStr) => {
+    const date = parseThaiDateNav(dateStr);
+    if (!date) return "-";
+    return new Intl.DateTimeFormat("th-TH", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+      timeZone: "Asia/Bangkok",
+    }).format(date);
+  };
+
+  const handleCheckQueue = () => {
+  if (!user) {
+    onClickLogin();
+    return;
+  }
+
+  history.push("/checkqueue");
+};
+  const getInitialFromThaiName = (fullname = "") => {
+    if (!fullname) return "?";
+    const prefixes = ["นาย", "นางสาว", "นาง"];
+    let name = fullname.trim();
+    prefixes.forEach(prefix => {
+      if (name.startsWith(prefix)) {
+        name = name.replace(prefix, "").trim();
+      }
+    });
+    return name.charAt(0);
+  };
+  const initial = user ? getInitialFromThaiName(user.name) : "?";
+  const getAvatarColor = name => {
+    const colors = ["bg-emerald-600", "bg-blue-600", "bg-purple-600", "bg-orange-600", "bg-pink-600"];
+    const index = name.charCodeAt(0) % colors.length;
+    return colors[index];
+  };
+  const convertToDriveThumbnail = (url, size = 200) => {
+    if (!url) return null;
+    const driveIdRegex = /(?:\/d\/|id=)([\w-]+)/;
+    const match = url.match(driveIdRegex);
+    if (match && match[1]) {
+      const fileId = match[1];
+      return `https://drive.google.com/thumbnail?id=${fileId}`;
+    }
+    return null;
+  };
+  return /*#__PURE__*/React.createElement("nav", {
+    className: "fixed top-0 z-20 w-full border-b border-base-200 bg-base-100 shadow-sm"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "padding-container py-2 sm:py-4"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "w-full flex items-center justify-between"
+  }, /*#__PURE__*/React.createElement(Link, {
+    to: "/",
+    className: "cursor-pointer duration-300 hover:scale-105"
+  }, /*#__PURE__*/React.createElement("img", {
+    src: "https://companieslogo.com/img/orig/COM7.BK_BIG-1d5f8726.png?t=1720244491",
+    alt: "com7-logo",
+    className: "h-7 sm:h-9"
+  })), /*#__PURE__*/React.createElement("div", {
+    className: "hidden lg:block"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center justify-end gap-6"
+  }, navbarMenu.map((item, index) => /*#__PURE__*/React.createElement(Link, {
+    key: item.path,
+    to: item.path,
+    onClick: handleScrollToTop,
+    className: `hover:text-emerald-600 duration-200 cursor-pointer ${isActive(item.path) ? "text-emerald-600 underline font-medium" : ""}`
+  }, item.name)), user && user.role === "USER" && /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: handleCheckQueue,
+    disabled: isQueueLoading,
+    className: "hover:text-emerald-600 duration-200 cursor-pointer disabled:cursor-wait disabled:opacity-60"
+  }, "\u0E15\u0E23\u0E27\u0E08\u0E2A\u0E2D\u0E1A\u0E25\u0E33\u0E14\u0E31\u0E1A\u0E04\u0E34\u0E27"), user ? /*#__PURE__*/React.createElement("div", {
+    className: "relative group cursor-pointer"
+  }, /*#__PURE__*/React.createElement("button", {
+    className: "flex items-center gap-2"
+  }, user.profile ? /*#__PURE__*/React.createElement("img", {
+    src: convertToDriveThumbnail(user.profile) || "https://www.shutterstock.com/image-vector/user-profile-icon-vector-avatar-600nw-2558760599.jpg",
+    alt: user.name,
+    className: "w-8 h-8 rounded-full object-cover"
+  }) : /*#__PURE__*/React.createElement("div", {
+    className: `w-8 h-8 rounded-full text-white flex items-center justify-center font-medium ${getAvatarColor(user.name)}`
+  }, initial), /*#__PURE__*/React.createElement("span", {
+    className: "font-medium text-sm"
+  }, user.name), /*#__PURE__*/React.createElement("i", {
+    className: "fa-solid fa-chevron-down group-hover:rotate-180 text-xs duration-300"
+  })), /*#__PURE__*/React.createElement("div", {
+    className: "absolute right-0 mt-0.5 w-72 bg-white border border-gray-300 shadow-lg rounded-xl\r opacity-0 group-hover:opacity-100\r pointer-events-none group-hover:pointer-events-auto transition"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "px-4 py-3"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center gap-3"
+  }, user.profile ? /*#__PURE__*/React.createElement("img", {
+    src: convertToDriveThumbnail(user.profile) || "https://www.shutterstock.com/image-vector/user-profile-icon-vector-avatar-600nw-2558760599.jpg",
+    alt: user.name,
+    className: "size-12 rounded-full object-cover"
+  }) : /*#__PURE__*/React.createElement("div", {
+    className: `w-8 h-8 rounded-full text-white flex items-center justify-center font-medium ${getAvatarColor(user.name)}`
+  }, initial), /*#__PURE__*/React.createElement("div", {
+    className: "flex flex-col"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "font-medium text-gray-800"
+  }, user.name), /*#__PURE__*/React.createElement("span", {
+    className: "text-sm text-gray-500"
+  }, user.email))), user.phone && /*#__PURE__*/React.createElement("div", {
+    className: "mt-4 text-sm text-gray-500 flex items-center gap-2"
+  }, /*#__PURE__*/React.createElement("i", {
+    className: "fa-solid fa-phone"
+  }), user.phone)), /*#__PURE__*/React.createElement("div", {
+    className: "border-t border-base-200"
+  }), /*#__PURE__*/React.createElement("button", {
+    onClick: onLogout,
+    className: "w-full text-left px-4 py-2 text-red-600\r hover:bg-red-50 rounded-b-xl cursor-pointer transition-colors duration-100"
+  }, /*#__PURE__*/React.createElement("i", {
+    className: "fa-solid fa-right-from-bracket mr-2"
+  }), "\u0E2D\u0E2D\u0E01\u0E08\u0E32\u0E01\u0E23\u0E30\u0E1A\u0E1A"))) : /*#__PURE__*/React.createElement("button", {
+    className: "bg-emerald-600 text-white rounded-box px-4 py-2 transform transition-all hover:-translate-y-0.5 duration-200 active:translate-y-0 hover:bg-emerald-500 cursor-pointer font-medium inline-block",
+    onClick: onClickLogin
+  }, "\u0E40\u0E02\u0E49\u0E32\u0E2A\u0E39\u0E48\u0E23\u0E30\u0E1A\u0E1A"))), /*#__PURE__*/React.createElement("div", {
+    className: "lg:hidden"
+  }, /*#__PURE__*/React.createElement("button", {
+    className: "btn btn-square btn-ghost",
+    onClick: () => setIsOpen(!isOpen)
+  }, isOpen ? /*#__PURE__*/React.createElement("i", {
+    className: "fa-solid fa-xmark text-lg text-gray-600"
+  }) : /*#__PURE__*/React.createElement("i", {
+    className: "fa-solid fa-bars text-lg text-gray-600"
+  }))))), isOpen && /*#__PURE__*/React.createElement("div", {
+    className: "lg:hidden absolute top-full left-0 w-full bg-base-100 border-b border-base-200 shadow-lg animate-slide-down rounded-b-xl"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex flex-col p-4 gap-4"
+  }, navbarMenu.map(item => /*#__PURE__*/React.createElement(Link, {
+    key: item.path,
+    to: item.path,
+    onClick: handleMobileClick,
+    className: `py-2 px-2 rounded-xl cursor-pointer transition-colors block ${isActive(item.path) ? "bg-base-200 text-emerald-600 font-medium" : "hover:bg-gray-50 text-gray-700"}`
+  }, item.name)), user && user.role === "USER" && /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: () => {
+      setIsOpen(false);
+      handleCheckQueue();
+    },
+    disabled: isQueueLoading,
+    className: "py-2 px-2 rounded-xl cursor-pointer transition-colors block text-left hover:bg-gray-50 text-gray-700 disabled:cursor-wait disabled:opacity-60"
+  }, "\u0E15\u0E23\u0E27\u0E08\u0E2A\u0E2D\u0E1A\u0E25\u0E33\u0E14\u0E31\u0E1A\u0E04\u0E34\u0E27"), user ? /*#__PURE__*/React.createElement("div", {
+    className: "p-2"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center gap-3"
+  }, user.profile ? /*#__PURE__*/React.createElement("img", {
+    src: convertToDriveThumbnail(user.profile) || "https://www.shutterstock.com/image-vector/user-profile-icon-vector-avatar-600nw-2558760599.jpg",
+    alt: user.name,
+    className: "size-14 rounded-full object-cover"
+  }) : /*#__PURE__*/React.createElement("div", {
+    className: `w-8 h-8 rounded-full text-white flex items-center justify-center font-medium ${getAvatarColor(user.name)}`
+  }, initial), /*#__PURE__*/React.createElement("div", {
+    className: "flex flex-col"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "font-medium text-gray-800"
+  }, user.name), /*#__PURE__*/React.createElement("span", {
+    className: "text-sm text-gray-500"
+  }, user.email))), user.phone && /*#__PURE__*/React.createElement("div", {
+    className: "mt-6 text-sm text-gray-500 flex items-center gap-2"
+  }, /*#__PURE__*/React.createElement("i", {
+    className: "fa-solid fa-phone"
+  }), user.phone), /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      onLogout();
+      handleMobileClick();
+    },
+    className: "mt-2 text-red-600 px-2 py-2 rounded-xl hover:bg-red-50 cursor-pointer w-full text-center"
+  }, "\u0E2D\u0E2D\u0E01\u0E08\u0E32\u0E01\u0E23\u0E30\u0E1A\u0E1A")) : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      onClickLogin();
+      handleMobileClick();
+    },
+    className: "w-full bg-emerald-600 text-white rounded-box px-4 py-2 font-medium active:scale-95 duration-200 shadow-md text-center block cursor-pointer"
+  }, "\u0E40\u0E02\u0E49\u0E32\u0E2A\u0E39\u0E48\u0E23\u0E30\u0E1A\u0E1A")))));
+};</script>

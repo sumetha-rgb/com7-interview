@@ -1,0 +1,92 @@
+<script type="text/javascript">var {
+  useHistory
+} = ReactRouterDOM;
+var EventCards = ({
+  events,
+  date
+}) => {
+  const history = useHistory();
+  // Parses server's "D/M/YYYY HH:mm:ss" Thai string explicitly — new Date()
+  // misreads it as M/D/YYYY and swaps day/month whenever day <= 12.
+  const parseThaiDateTime = str => {
+    if (!str) return null;
+    const match = String(str).trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{1,4})[,\s]+(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?/);
+    if (!match) {
+      const fallback = new Date(str);
+      return isNaN(fallback.getTime()) ? null : fallback;
+    }
+    let [, day, month, year, hour, minute, second] = match.slice(1).map(Number);
+    if (year > 2400) year -= 543;
+    return new Date(year, month - 1, day, hour, minute, second || 0);
+  };
+  const formatDate = dateString => {
+    if (!dateString) return "-";
+    const date = parseThaiDateTime(dateString) || new Date(dateString);
+    if (date.getFullYear() > 2400) date.setFullYear(date.getFullYear() - 543);
+    return date.toLocaleDateString("th-TH", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit"
+    });
+  };
+  const handleClick = (eventId, name, location, type, eventJobType) => {
+    const params = new URLSearchParams();
+    if (eventId) params.append("eventId", eventId);
+    if (eventJobType) params.append("eventJobType", eventJobType);
+    if (name) params.append("eventName", name);
+    if (location) params.append("eventLocation", location);
+    if (type) params.append("eventType", type);
+    history.push({
+      pathname: "/events/slots",
+      search: params.toString()
+    });
+    window.scrollTo(0, 0);
+  };
+  return /*#__PURE__*/React.createElement(React.Fragment, null, events.map((event, index) => /*#__PURE__*/React.createElement("div", {
+    key: index,
+    onClick: () => handleClick(event.Sheet_ID, event.Event_Name, event.Location, event.Event_Type, event.Job_Type),
+    className: "group rounded-xl overflow-hidden shadow-lg hover:-translate-y-1 transition-all duration-500 cursor-pointer"
+  }, /*#__PURE__*/React.createElement("figure", {
+    className: "relative h-48 sm:h-56 overflow-hidden p-2"
+  }, /*#__PURE__*/React.createElement("img", {
+    src: event.Image_Url,
+    alt: event.Event_Name,
+    className: "w-full h-full object-cover transition-tranform duration-500 group-hover:scale-105"
+  }), event.Status && /*#__PURE__*/React.createElement("div", {
+    className: `absolute top-4 right-4 badge border-none rounded-full text-white font-medium shadow-sm ${event.Status ? "bg-emerald-500" : "bg-rose-500"}`
+  }, event.Status ? "Active" : "Inactive"), /*#__PURE__*/React.createElement("div", {
+    className: "absolute top-4 left-4 badge badge-ghost rounded-full bg-base-300 backdrop-blur-sm text-xs font-bold"
+  }, event.Event_Type)), /*#__PURE__*/React.createElement("div", {
+    className: "p-4 sm:p-5 border-t border-gray-100"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex flex-col items-start justify-center gap-1"
+  }, /*#__PURE__*/React.createElement("h2", {
+    className: "text-lg font-medium"
+  }, event.Event_Name), /*#__PURE__*/React.createElement("div", {
+    className: "space-y-2 mt-2 text-sm text-gray-600"
+  }, event.Opening_At && event.Closing_At && /*#__PURE__*/React.createElement("div", {
+    className: "flex items-start gap-2"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "mt-0.5 text-emerald-600"
+  }, /*#__PURE__*/React.createElement("i", {
+    className: "fa-regular fa-clock"
+  })), /*#__PURE__*/React.createElement("div", {
+    className: "flex flex-col"
+  }, /*#__PURE__*/React.createElement("span", null, "\u0E40\u0E23\u0E34\u0E48\u0E21: ", formatDate(event.Opening_At)), /*#__PURE__*/React.createElement("span", null, "\u0E2A\u0E34\u0E49\u0E19\u0E2A\u0E38\u0E14: ", formatDate(event.Closing_At)))), event.Location && /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center gap-2"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "text-rose-500"
+  }, /*#__PURE__*/React.createElement("i", {
+    className: "fa-solid fa-location-dot"
+  })), /*#__PURE__*/React.createElement("span", {
+    className: "line-clamp-1"
+  }, event.Location))), event.status && /*#__PURE__*/React.createElement("p", {
+    className: "w-full text-sm text-gray-600 text-center"
+  }, event.status === "ว่าง" ? /*#__PURE__*/React.createElement("span", {
+    className: "text-success"
+  }, "\u0E27\u0E48\u0E32\u0E07") : /*#__PURE__*/React.createElement("span", {
+    className: "text-error"
+  }, "\u0E44\u0E21\u0E48\u0E27\u0E48\u0E32\u0E07")))))));
+};</script>

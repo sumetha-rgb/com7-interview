@@ -1,0 +1,461 @@
+<script type="text/javascript">var {
+  useState,
+  useEffect
+} = React;
+var AddSlotModal = ({
+  isOpen,
+  onClose,
+  onSuccess,
+  user,
+  queryDate,
+  eventId,
+  eventType,
+  openingAt,
+  closingAt
+}) => {
+  // Normalize a stored date (which may use the Buddhist calendar year, e.g. 2569) to a JS Date.
+  const toGregorianDate = dateValue => {
+    if (!dateValue) return null;
+    const d = new Date(dateValue);
+    if (isNaN(d.getTime())) return null;
+    if (d.getFullYear() > 2400) d.setFullYear(d.getFullYear() - 543);
+    return d;
+  };
+  const isOnsite = (eventType || "").toString().toUpperCase() === "ONSITE";
+  const eventMinDate = isOnsite ? toGregorianDate(openingAt) : null;
+  const eventMaxDate = isOnsite ? toGregorianDate(closingAt) : null;
+  // Onsite: restrict slot creation to the event's own opening–closing window.
+  // Online keeps the previous unrestricted behavior (only blocking past dates).
+  const dateOptions = isOnsite ? {
+    dateFormat: "Y-m-d",
+    ...(eventMinDate ? {
+      minDate: eventMinDate
+    } : {
+      minDate: "today"
+    }),
+    ...(eventMaxDate ? {
+      maxDate: eventMaxDate
+    } : {})
+  } : {
+    dateFormat: "Y-m-d",
+    minDate: "today"
+  };
+  const toDateKey = d => {
+    if (!d) return "";
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+  };
+  const toTimeStr = d => {
+    if (!d) return "";
+    return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+  };
+  // 1. State หลัก
+  const [formData, setFormData] = useState({
+    eventId,
+    userName: user?.name || "",
+    userRole: user?.role || "",
+    date: queryDate || "",
+    startSlotTime: "10:00",
+    endSlotTime: "16:00",
+    period: "60"
+  });
+
+  // On the event's opening/closing day (onsite only), slot times must stay
+  // within the event's opening/closing time-of-day, not just the date.
+  const selectedDateKey = formData.date;
+  const openDateKey = isOnsite ? toDateKey(eventMinDate) : "";
+  const closeDateKey = isOnsite ? toDateKey(eventMaxDate) : "";
+  const dayMinTime = isOnsite && selectedDateKey && selectedDateKey === openDateKey ? toTimeStr(eventMinDate) : null;
+  const dayMaxTime = isOnsite && selectedDateKey && selectedDateKey === closeDateKey ? toTimeStr(eventMaxDate) : null;
+  useEffect(() => {
+    if (!isOnsite) return;
+    setFormData(prev => {
+      let {
+        startSlotTime,
+        endSlotTime
+      } = prev;
+      if (dayMinTime && startSlotTime < dayMinTime) startSlotTime = dayMinTime;
+      if (dayMaxTime && endSlotTime > dayMaxTime) endSlotTime = dayMaxTime;
+      if (startSlotTime === prev.startSlotTime && endSlotTime === prev.endSlotTime) return prev;
+      return {
+        ...prev,
+        startSlotTime,
+        endSlotTime
+      };
+    });
+  }, [isOnsite, dayMinTime, dayMaxTime]);
+  const [buConfig, setBuConfig] = useState([{
+    name: "ภาคเหนือ",
+    capacity: 15
+  }, {
+    name: "ภาคตะวันออกเฉียงเหนือ",
+    capacity: 15
+  }, {
+    name: "ภาคกลาง",
+    capacity: 15
+  }, {
+    name: "ภาคตะวันออก",
+    capacity: 15
+  }, {
+    name: "ภาคตะวันตก",
+    capacity: 15
+  }, {
+    name: "ภาคใต้",
+    capacity: 15
+  }, {
+    name: "กรุงเทพมหานคร",
+    capacity: 15
+  }, {
+    name: "ปริมณฑล",
+    capacity: 15
+  }]);
+  const [newBu, setNewBu] = useState({
+    name: "",
+    capacity: 1
+  });
+  const [generatedSlots, setGeneratedSlots] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const handleChange = e => {
+    const {
+      name,
+      value
+    } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+  const handleDateChange = (field, value) => {
+    setFormData(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
+  const handleGenerateSlots = () => {
+    if (buConfig.length === 0) {
+      Swal.fire("ไม่พบข้อมูล BU", "กรุณาเพิ่มหน่วยงาน (BU) อย่างน้อย 1 รายการ", "warning");
+      return;
+    }
+    const {
+      period,
+      date
+    } = formData;
+    let {
+      startSlotTime,
+      endSlotTime
+    } = formData;
+    // Safety net in case the time pickers were bypassed (e.g. typed manually).
+    if (dayMinTime && startSlotTime < dayMinTime) startSlotTime = dayMinTime;
+    if (dayMaxTime && endSlotTime > dayMaxTime) endSlotTime = dayMaxTime;
+    if (!startSlotTime || !endSlotTime || !period || !date) {
+      Swal.fire("ข้อมูลไม่ครบ", "กรุณากรอกข้อมูลเวลาให้ครบถ้วน", "warning");
+      return;
+    }
+    const getBaseDate = timeStr => {
+      const d = new Date();
+      const [hours, minutes] = timeStr.split(":").map(Number);
+      d.setHours(hours, minutes, 0, 0);
+      return d;
+    };
+    let current = getBaseDate(startSlotTime);
+    const end = getBaseDate(endSlotTime);
+    const periodNum = parseInt(period);
+    const newSlots = [];
+    while (current < end) {
+      const nextTime = new Date(current.getTime() + periodNum * 60000);
+      if (nextTime > end) break;
+      const formatTime = d => d.toLocaleTimeString("en-GB", {
+        hour: "2-digit",
+        minute: "2-digit"
+      });
+      newSlots.push({
+        date: date,
+        startTime: formatTime(current),
+        endTime: formatTime(nextTime),
+        // Clone BU Config ไปใช้เป็นค่าเริ่มต้นของ Slot นี้
+        bu: JSON.parse(JSON.stringify(buConfig))
+      });
+      current = nextTime;
+    }
+    setGeneratedSlots(newSlots);
+  };
+  const handleAddBu = e => {
+    e.preventDefault();
+    if (newBu.name.trim() === "") return;
+
+    // ป้องกันชื่อซ้ำ
+    if (buConfig.some(b => b.name === newBu.name)) {
+      Swal.fire("ชื่อซ้ำ", "มีหน่วยงานนี้อยู่แล้ว", "warning");
+      return;
+    }
+    setBuConfig([...buConfig, {
+      ...newBu,
+      capacity: parseInt(newBu.capacity) || 0
+    }]);
+    setNewBu({
+      name: "",
+      capacity: 1
+    });
+  };
+  const handleRemoveBu = index => {
+    const newConfig = buConfig.filter((_, i) => i !== index);
+    setBuConfig(newConfig);
+  };
+  const handleSave = () => {
+    const formattedSlots = generatedSlots.map(slot => {
+      const buList = slot.bu.filter(a => a.name && a.name.trim() !== "").map(a => ({
+        name: a.name,
+        capacity: parseInt(a.capacity) || 0 // แปลง string เป็น int
+      }));
+      return {
+        startTime: slot.startTime,
+        endTime: slot.endTime,
+        bu: buList
+      };
+    });
+
+    // 2. สร้าง Payload ก้อนใหญ่รวม Metadata
+    const payload = {
+      eventId: formData.eventId,
+      date: formData.date,
+      userName: formData.userName,
+      userRole: formData.userRole,
+      slots: formattedSlots
+    };
+
+    // Validation: ตรวจสอบว่ามีข้อมูล Slot หรือไม่
+    if (payload.slots.length === 0) {
+      Swal.fire("ข้อมูลว่างเปล่า", "กรุณาสร้างสล็อตก่อนบันทึก", "warning");
+      return;
+    }
+    setIsLoading(true);
+    google.script.run.withSuccessHandler(res => {
+      if (res.success) {
+        Swal.fire({
+          icon: "success",
+          title: res.message,
+          timer: 2000
+        }).then(() => {
+          onSuccess();
+          setIsLoading(false);
+        });
+      } else {
+        Swal.fire({
+          icon: "error",
+          title: res.message,
+          timer: 2000
+        });
+        setIsLoading(false);
+      }
+      setIsLoading(false);
+    }).withFailureHandler(err => {
+      Swal.fire({
+        icon: "error",
+        title: "เกิดข้อผิดพลาด",
+        text: err.message || "เกิดข้อผิดพลาดในการเข้าสู่ระบบ",
+        timer: 2000
+      });
+      setIsLoading(false);
+    }).createSlotEvent(payload);
+  };
+  const handleTableCapacityChange = (slotIndex, buIndex, value) => {
+    const updatedSlots = [...generatedSlots];
+    updatedSlots[slotIndex].bu[buIndex].capacity = parseInt(value) || 0;
+    setGeneratedSlots(updatedSlots);
+  };
+  if (!isOpen) return null;
+  return /*#__PURE__*/React.createElement("div", {
+    className: "fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "absolute inset-0 bg-black/60 transition-opacity",
+    onClick: onClose
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "bg-base-100 w-full max-w-4xl mx-auto rounded-xl shadow-2xl z-50 flex flex-col max-h-[90vh] animate-fade-in-up"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex justify-between items-center p-5 border-b border-base-300"
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("h2", {
+    className: "text-xl font-medium"
+  }, "\u0E2A\u0E23\u0E49\u0E32\u0E07\u0E2A\u0E25\u0E47\u0E2D\u0E15\u0E40\u0E27\u0E25\u0E32 (Batch Generate)"), /*#__PURE__*/React.createElement("p", {
+    className: "text-xs text-gray-500 mt-1"
+  }, "\u0E01\u0E33\u0E2B\u0E19\u0E14\u0E0A\u0E48\u0E27\u0E07\u0E40\u0E27\u0E25\u0E32\u0E40\u0E1E\u0E37\u0E48\u0E2D\u0E2A\u0E23\u0E49\u0E32\u0E07 Slot \u0E2D\u0E31\u0E15\u0E42\u0E19\u0E21\u0E31\u0E15\u0E34")), /*#__PURE__*/React.createElement("button", {
+    onClick: onClose,
+    className: "btn btn-sm btn-circle btn-ghost"
+  }, /*#__PURE__*/React.createElement("i", {
+    className: "fa-solid fa-xmark text-lg"
+  }))), /*#__PURE__*/React.createElement("div", {
+    className: "p-6 overflow-y-auto custom-scrollbar"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "grid grid-cols-1 gap-6 mb-6"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "lg:col-span-1 space-y-4 bg-gray-50 p-4 rounded-xl border border-gray-200"
+  }, /*#__PURE__*/React.createElement(FlatpickrInput, {
+    label: "\u0E27\u0E31\u0E19\u0E17\u0E35\u0E48\u0E2A\u0E23\u0E49\u0E32\u0E07\u0E2A\u0E25\u0E47\u0E2D\u0E15",
+    value: formData.date,
+    onChange: val => handleDateChange("date", val),
+    options: dateOptions
+  }), isOnsite && (eventMinDate || eventMaxDate) && /*#__PURE__*/React.createElement("p", {
+    className: "text-xs text-gray-400 -mt-2"
+  }, "\u0E2A\u0E23\u0E49\u0E32\u0E07\u0E2A\u0E25\u0E47\u0E2D\u0E15\u0E44\u0E14\u0E49\u0E43\u0E19\u0E0A\u0E48\u0E27\u0E07\u0E27\u0E31\u0E19\u0E17\u0E35\u0E48\u0E40\u0E1B\u0E34\u0E14-\u0E1B\u0E34\u0E14\u0E02\u0E2D\u0E07\u0E2D\u0E35\u0E40\u0E27\u0E19\u0E15\u0E4C\u0E40\u0E17\u0E48\u0E32\u0E19\u0E31\u0E49\u0E19 (Onsite)"), (dayMinTime || dayMaxTime) && /*#__PURE__*/React.createElement("p", {
+    className: "text-xs text-amber-600 -mt-2"
+  }, "\u0E27\u0E31\u0E19\u0E19\u0E35\u0E49\u0E40\u0E1B\u0E47\u0E19\u0E27\u0E31\u0E19", dayMinTime ? " \u0E40\u0E1B\u0E34\u0E14\u0E2D\u0E35\u0E40\u0E27\u0E19\u0E15\u0E4C " + dayMinTime : "", dayMaxTime ? " \u0E1B\u0E34\u0E14\u0E2D\u0E35\u0E40\u0E27\u0E19\u0E15\u0E4C " + dayMaxTime : "", " \u0E40\u0E27\u0E25\u0E32\u0E2A\u0E25\u0E47\u0E2D\u0E15\u0E08\u0E30\u0E16\u0E39\u0E01\u0E08\u0E33\u0E01\u0E31\u0E14\u0E43\u0E2B\u0E49\u0E2D\u0E22\u0E39\u0E48\u0E43\u0E19\u0E0A\u0E48\u0E27\u0E07\u0E19\u0E35\u0E49"), /*#__PURE__*/React.createElement("div", {
+    className: "grid grid-cols-2 gap-2"
+  }, /*#__PURE__*/React.createElement(FlatpickrInput, {
+    label: "\u0E40\u0E27\u0E25\u0E32\u0E40\u0E23\u0E34\u0E48\u0E21",
+    value: formData.startSlotTime,
+    onChange: val => handleDateChange("startSlotTime", val),
+    options: {
+      enableTime: true,
+      noCalendar: true,
+      dateFormat: "H:i",
+      time_24hr: true,
+      ...(dayMinTime ? {
+        minTime: dayMinTime
+      } : {}),
+      ...(dayMaxTime ? {
+        maxTime: dayMaxTime
+      } : {})
+    }
+  }), /*#__PURE__*/React.createElement(FlatpickrInput, {
+    label: "\u0E40\u0E27\u0E25\u0E32\u0E2A\u0E34\u0E49\u0E19\u0E2A\u0E38\u0E14",
+    value: formData.endSlotTime,
+    onChange: val => handleDateChange("endSlotTime", val),
+    options: {
+      enableTime: true,
+      noCalendar: true,
+      dateFormat: "H:i",
+      time_24hr: true,
+      ...(dayMinTime ? {
+        minTime: dayMinTime
+      } : {}),
+      ...(dayMaxTime ? {
+        maxTime: dayMaxTime
+      } : {})
+    }
+  })), /*#__PURE__*/React.createElement("div", {
+    className: "w-full"
+  }, /*#__PURE__*/React.createElement("label", {
+    className: "text-gray-500 tex-sm"
+  }, "\u0E0A\u0E48\u0E27\u0E07\u0E40\u0E27\u0E25\u0E32 (\u0E19\u0E32\u0E17\u0E35)"), /*#__PURE__*/React.createElement("input", {
+    type: "number",
+    value: formData.period,
+    onChange: e => setFormData(prev => ({
+      ...prev,
+      period: e.target.value
+    })),
+    className: "input input-bordered w-full"
+  }))), /*#__PURE__*/React.createElement("div", {
+    className: "lg:col-span-2 space-y-4 bg-base-10 p-4 rounded-xl border border-base-300"
+  }, /*#__PURE__*/React.createElement("h3", {
+    className: "font-medium border-b border-base-300 pb-2 mb-2 flex justify-between"
+  }, /*#__PURE__*/React.createElement("span", null, "\u0E08\u0E31\u0E14\u0E01\u0E32\u0E23\u0E2B\u0E19\u0E48\u0E27\u0E22\u0E07\u0E32\u0E19 (BUs)"), /*#__PURE__*/React.createElement("span", {
+    className: "text-xs font-normal text-gray-500"
+  }, "\u0E04\u0E48\u0E32 Capacity \u0E40\u0E23\u0E34\u0E48\u0E21\u0E15\u0E49\u0E19")), /*#__PURE__*/React.createElement("div", {
+    className: "flex gap-2 items-end"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "form-control w-full"
+  }, /*#__PURE__*/React.createElement("label", {
+    className: "label py-0 mb-1"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "label-text text-xs"
+  }, "\u0E0A\u0E37\u0E48\u0E2D\u0E2B\u0E19\u0E48\u0E27\u0E22\u0E07\u0E32\u0E19")), /*#__PURE__*/React.createElement("input", {
+    type: "text",
+    placeholder: "\u0E40\u0E0A\u0E48\u0E19 \u0E40\u0E2B\u0E19\u0E37\u0E2D",
+    className: "input input-sm input-bordered w-full bg-white",
+    value: newBu.name,
+    onChange: e => setNewBu({
+      ...newBu,
+      name: e.target.value
+    }),
+    onKeyDown: e => e.key === "Enter" && handleAddBu(e)
+  })), /*#__PURE__*/React.createElement("div", {
+    className: "form-control w-24"
+  }, /*#__PURE__*/React.createElement("label", {
+    className: "label py-0 mb-1"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "label-text text-xs"
+  }, "\u0E42\u0E04\u0E27\u0E15\u0E49\u0E32")), /*#__PURE__*/React.createElement("input", {
+    type: "number",
+    className: "input input-sm input-bordered w-full text-center bg-white",
+    value: newBu.capacity,
+    onChange: e => setNewBu({
+      ...newBu,
+      capacity: e.target.value
+    }),
+    onKeyDown: e => e.key === "Enter" && handleAddBu(e)
+  })), /*#__PURE__*/React.createElement("button", {
+    onClick: handleAddBu,
+    className: "btn btn-sm bg-emerald-600 hover:bg-emerald-500 text-white border-none"
+  }, /*#__PURE__*/React.createElement("i", {
+    className: "fa-solid fa-plus"
+  }), " \u0E40\u0E1E\u0E34\u0E48\u0E21")), /*#__PURE__*/React.createElement("div", {
+    className: "flex flex-wrap gap-2 mt-3 min-h-[60px] content-start"
+  }, buConfig.length > 0 ? buConfig.map((b, idx) => /*#__PURE__*/React.createElement("div", {
+    key: idx,
+    className: "badge badge-lg gap-2 pl-3 pr-1 py-4 bg-base-100 shadow-sm border border-base300"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "font-medium"
+  }, b.name), /*#__PURE__*/React.createElement("span", {
+    className: "badge badge-sm badge-neutral"
+  }, b.capacity), /*#__PURE__*/React.createElement("button", {
+    onClick: () => handleRemoveBu(idx),
+    className: "btn btn-ghost btn-xs btn-circle text-gray-400 hover:text-red-500"
+  }, /*#__PURE__*/React.createElement("i", {
+    className: "fa-solid fa-times"
+  })))) : /*#__PURE__*/React.createElement("div", {
+    className: "text-gray-400 text-sm italic w-full text-center py-2"
+  }, "\u0E22\u0E31\u0E07\u0E44\u0E21\u0E48\u0E21\u0E35\u0E2B\u0E19\u0E48\u0E27\u0E22\u0E07\u0E32\u0E19 (\u0E01\u0E23\u0E38\u0E13\u0E32\u0E40\u0E1E\u0E34\u0E48\u0E21)")), /*#__PURE__*/React.createElement("div", {
+    className: "divider my-0"
+  }), /*#__PURE__*/React.createElement("button", {
+    onClick: handleGenerateSlots,
+    className: "btn w-full bg-emerald-600 hover:bg-emerald-500 text-white shadow-md border-none"
+  }, /*#__PURE__*/React.createElement("i", {
+    className: "fa-solid fa-wand-magic-sparkles"
+  }), " ", "\u0E2A\u0E23\u0E49\u0E32\u0E07\u0E23\u0E32\u0E22\u0E01\u0E32\u0E23\u0E2A\u0E25\u0E47\u0E2D\u0E15"))), generatedSlots.length > 0 && /*#__PURE__*/React.createElement("div", {
+    className: "animate-fade-in border-base-300 overflow-hidden space-y-3"
+  }, /*#__PURE__*/React.createElement("p", {
+    className: "font-medium p-2 rounded-md bg-emerald-50 text-emerald-600 border border-emerald-300 w-max"
+  }, "\u0E1E\u0E23\u0E35\u0E27\u0E34\u0E27\u0E23\u0E32\u0E22\u0E01\u0E32\u0E23 (", generatedSlots.length, " \u0E0A\u0E48\u0E27\u0E07\u0E40\u0E27\u0E25\u0E32)"), /*#__PURE__*/React.createElement("div", {
+    className: "overflow-x-auto rounded-lg border border-base-300 shadow-sm"
+  }, /*#__PURE__*/React.createElement("table", {
+    className: "table table-pin-rows w-full bg-white"
+  }, /*#__PURE__*/React.createElement("thead", {
+    className: "text-gray-600 bg-gray-50"
+  }, /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("th", {
+    className: "w-40 bg-gray-50"
+  }, "\u0E0A\u0E48\u0E27\u0E07\u0E40\u0E27\u0E25\u0E32"), buConfig.map((bu, i) => /*#__PURE__*/React.createElement("th", {
+    key: i,
+    className: "text-center min-w-[100px] bg-gray-50 text-nowrap"
+  }, bu.name)))), /*#__PURE__*/React.createElement("tbody", null, generatedSlots.map((slot, slotIdx) => /*#__PURE__*/React.createElement("tr", {
+    key: slotIdx,
+    className: "hover:bg-gray-50 border-b"
+  }, /*#__PURE__*/React.createElement("td", {
+    className: "font-medium text-emerald-700 text-nowrap text-sm"
+  }, slot.startTime, " - ", slot.endTime), slot.bu.map((b, buIdx) => /*#__PURE__*/React.createElement("td", {
+    key: buIdx,
+    className: "p-2 text-center"
+  }, /*#__PURE__*/React.createElement("input", {
+    type: "number",
+    min: "0",
+    value: b.capacity,
+    onChange: e => handleTableCapacityChange(slotIdx, buIdx, e.target.value),
+    className: `input input-bordered w-16 text-center ${b.capacity > 0 ? "bg-emerald-50 border-emerald-300 font-bold text-emerald-700" : "text-gray-300"}`
+  })))))))))), /*#__PURE__*/React.createElement("div", {
+    className: "p-5 border-t bg-base-100 border-base-300 flex justify-end gap-3 rounded-b-xl"
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: onClose,
+    type: "button",
+    disabled: isLoading,
+    className: "btn btn-ghost text-gray-500"
+  }, "\u0E22\u0E01\u0E40\u0E25\u0E34\u0E01"), /*#__PURE__*/React.createElement("button", {
+    type: "submit",
+    onClick: handleSave,
+    className: "btn bg-emerald-600 hover:bg-emerald-500 text-white gap-2 shadow-md disabled:bg-gray-300",
+    disabled: generatedSlots.length === 0 || isLoading
+  }, isLoading ? /*#__PURE__*/React.createElement("span", {
+    className: "loading loading-spinner loading-md"
+  }) : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("i", {
+    className: "fa-solid fa-save"
+  }), " \u0E1A\u0E31\u0E19\u0E17\u0E36\u0E01\u0E02\u0E49\u0E2D\u0E21\u0E39\u0E25 (", generatedSlots.length, ")")))));
+};</script>

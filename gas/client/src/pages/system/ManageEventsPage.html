@@ -1,0 +1,252 @@
+<script type="text/javascript">var {
+  useState,
+  useEffect,
+  useRef
+} = React;
+var ManageEventsPage = ({
+  user
+}) => {
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(6);
+  const [search, setSearch] = useState("");
+  const [status, setStatus] = useState("");
+  const [events, setEvents] = useState([]);
+  const [paginationData, setPaginationData] = useState({});
+  const [jobTypeDropdown, setJobTypeDropdown] = useState([]);
+  const [isAddEventModalOpen, setIsAddModalOpen] = useState(false);
+  const [isClickUpdate, setIsClickUpdate] = useState(null);
+  const [isTransactionModalOpen, setIsTransactionModalOpen] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const requestIdRef = useRef(0); // เก็บ id ของ request ล่าสุด กันเคสเก่ามาทับใหม่
+
+  const getEventsData = () => {
+    const currentRequestId = ++requestIdRef.current; // ตั๋วของ request รอบนี้
+    setIsLoading(true);
+    const query = {
+      page,
+      limit,
+      search,
+      status
+    };
+    const userRole = user ? user.role : "USER";
+    google.script.run.withSuccessHandler(res => {
+      if (currentRequestId !== requestIdRef.current) return; // มี request ใหม่กว่าแล้ว ทิ้งอันนี้
+      if (res.success === true) {
+        setEvents(res.data);
+        setPaginationData(res.pagination);
+      } else {
+        Swal.fire({
+          icon: "error",
+          title: "เกิดข้อผิดพลาด",
+          text: res.message,
+          timer: 2000
+        });
+      }
+      setIsLoading(false);
+    }).withFailureHandler(err => {
+      if (currentRequestId !== requestIdRef.current) return;
+      if (err) {
+        Swal.fire({
+          icon: "error",
+          title: "เกิดข้อผิดพลาด",
+          text: err.message,
+          timer: 2000
+        });
+      }
+      setIsLoading(false);
+    }).getEventsData(query, userRole);
+  };
+  const fetchJobTypeDropdown = () => {
+    google.script.run.withSuccessHandler(res => {
+      if (res) {
+        setJobTypeDropdown(res);
+      }
+    }).withFailureHandler(err => {
+      if (err) {
+        Swal.fire({
+          icon: "error",
+          title: "เกิดข้อผิดพลาด",
+          text: err.message,
+          timer: 2000
+        });
+      }
+    }).getJobTypeDropdown();
+  };
+  const handleEditEvent = event => {
+    setIsClickUpdate(event);
+  };
+  const handleTransactionEvent = event => {
+    setIsTransactionModalOpen(event);
+  };
+  const handleDeleteEvent = event => {
+    Swal.fire({
+      title: "ยืนยันการลบ?",
+      text: `คุณต้องการลบอีเวนต์ "${event.Event_Name}" ใช่หรือไม่?`,
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonColor: "#d33",
+      cancelButtonColor: "#3085d6",
+      confirmButtonText: "ลบข้อมูล",
+      cancelButtonText: "ยกเลิก",
+      showLoaderOnConfirm: true,
+      allowOutsideClick: () => !Swal.isLoading(),
+      preConfirm: () => {
+        Swal.showLoading();
+        const data = {
+          eventId: event.Sheet_ID,
+          userRole: user.role
+        };
+        return new Promise(resolve => {
+          google.script.run.withSuccessHandler(res => {
+            if (res.success) {
+              resolve(res); // resoponse data to then
+            } else {
+              Swal.showValidationMessage(res.message || "เกิดข้อผิดพลาดจากเซิร์ฟเวอร์");
+              resolve(null);
+            }
+          }).withFailureHandler(err => {
+            Swal.showValidationMessage(`เกิดข้อผิดพลาด: ${err.message}`);
+            resolve(null);
+          }).deleteEventData(data);
+        });
+      }
+    }).then(result => {
+      if (result.isConfirmed && result.value) {
+        Swal.fire({
+          icon: "success",
+          title: "ลบอีเวนต์สำเร็จ",
+          text: result.value.message,
+          timer: 2000,
+          showConfirmButton: false
+        }).then(() => {
+          getEventsData();
+        });
+      }
+    });
+  };
+  useEffect(() => {
+    getEventsData();
+  }, [page, limit, status]);
+
+  useEffect(() => {
+    if (search === "") {
+      setPage(1); // page อยู่ใน deps ของ effect บน จะ trigger fetch เองอัตโนมัติ
+    }
+  }, [search]);
+
+  useEffect(() => {
+    fetchJobTypeDropdown();
+  }, []);
+
+  // ใช้จุดเดียวสำหรับยิงค้นหา ทั้งกด Enter และกดปุ่ม submit ของ form
+  const handleSearchSubmit = () => {
+    if (page !== 1) {
+      setPage(1); // จะ trigger useEffect แรกให้ fetch เอง
+    } else {
+      getEventsData(); // อยู่หน้า 1 อยู่แล้ว ต้อง fetch เอง
+    }
+  };
+  return /*#__PURE__*/React.createElement("div", {
+    className: "w-full max-w-7xl xl:max-w-[1440px] mx-auto pb-24"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex flex-col sm:flex-row items-center justify-center sm:justify-between gap-6 mb-6 animate-fade-in-up"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex flex-col text-center sm:text-start"
+  }, /*#__PURE__*/React.createElement(SystemHeader, {
+    title: "\u0E08\u0E31\u0E14\u0E01\u0E32\u0E23\u0E2D\u0E35\u0E40\u0E27\u0E19\u0E15\u0E4C",
+    subTitle: "\u0E15\u0E23\u0E27\u0E08\u0E2A\u0E2D\u0E1A\u0E41\u0E25\u0E30\u0E41\u0E01\u0E49\u0E44\u0E02\u0E02\u0E49\u0E2D\u0E21\u0E39\u0E25\u0E2D\u0E35\u0E40\u0E27\u0E19\u0E15\u0E4C\u0E41\u0E25\u0E30\u0E2A\u0E25\u0E47\u0E2D\u0E15\u0E43\u0E19\u0E23\u0E30\u0E1A\u0E1A"
+  })), /*#__PURE__*/React.createElement("div", {
+    className: "flex flex-col sm:flex-row justify-center sm:justify-end w-full sm:w-auto gap-3 flex-1"
+  }, /*#__PURE__*/React.createElement("form", {
+    onSubmit: e => {
+      e.preventDefault();
+      handleSearchSubmit();
+    },
+    className: "relative w-full sm:w-60"
+  }, /*#__PURE__*/React.createElement("input", {
+    type: "text",
+    value: search,
+    onChange: e => setSearch(e.target.value),
+    placeholder: "\u0E04\u0E49\u0E19\u0E2B\u0E32\u0E0A\u0E37\u0E48\u0E2D\u0E2D\u0E35\u0E40\u0E27\u0E19\u0E15\u0E4C...",
+    className: "input input-bordered w-full "
+  })), /*#__PURE__*/React.createElement("div", {
+    className: "w-full sm:w-48"
+  }, /*#__PURE__*/React.createElement("select", {
+    onChange: e => setStatus(e.target.value),
+    className: "select select-bordered w-full text-gray-600",
+    defaultValue: ""
+  }, /*#__PURE__*/React.createElement("option", {
+    value: "",
+    disabled: true,
+    selected: true
+  }, "\u0E2A\u0E16\u0E32\u0E19\u0E30"), " ", /*#__PURE__*/React.createElement("option", {
+    value: ""
+  }, "\u0E17\u0E31\u0E49\u0E07\u0E2B\u0E21\u0E14"), /*#__PURE__*/React.createElement("option", {
+    value: "TRUE"
+  }, "\uD83D\uDFE2 \u0E40\u0E1B\u0E34\u0E14\u0E43\u0E0A\u0E49\u0E07\u0E32\u0E19"), /*#__PURE__*/React.createElement("option", {
+    value: "FALSE"
+  }, "\uD83D\uDD34 \u0E1B\u0E34\u0E14\u0E43\u0E0A\u0E49\u0E07\u0E32\u0E19"))), /*#__PURE__*/React.createElement("div", {
+    className: "w-full sm:w-auto"
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: () => setIsAddModalOpen(true),
+    className: "btn bg-emerald-600 hover:bg-emerald-700 text-white w-full sm:w-auto shadow-md hover:shadow-lg border-none flex items-center gap-2"
+  }, "\u0E40\u0E1E\u0E34\u0E48\u0E21\u0E2D\u0E35\u0E40\u0E27\u0E19\u0E15\u0E4C\u0E43\u0E2B\u0E21\u0E48")))), isLoading ? /*#__PURE__*/React.createElement("div", {
+    className: "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
+  }, [...Array(3)].map((_, i) => /*#__PURE__*/React.createElement("div", {
+    key: i,
+    className: "flex flex-col gap-4 w-full animate-pulse"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "skeleton h-48 w-full rounded-xl"
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "skeleton h-4 w-28"
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "skeleton h-4 w-full"
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "skeleton h-4 w-full"
+  })))) : events.length > 0 ? /*#__PURE__*/React.createElement("div", {
+    className: "animate-fade-in-up"
+  }, /*#__PURE__*/React.createElement("p", {
+    className: "text-gray-500 mt-8"
+  }, "\u0E17\u0E31\u0E49\u0E07\u0E2B\u0E21\u0E14: ", events.length, " \u0E2D\u0E35\u0E40\u0E27\u0E19\u0E15\u0E4C"), /*#__PURE__*/React.createElement("div", {
+    className: "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-4"
+  }, events.map((event, index) => /*#__PURE__*/React.createElement(SystemEventCard, {
+    key: index,
+    event: event,
+    onEdit: handleEditEvent,
+    onDelete: handleDeleteEvent,
+    onTransaction: handleTransactionEvent,
+    user: user
+  }))), /*#__PURE__*/React.createElement(PagePagination, {
+    currentPage: paginationData.currentPage || 1,
+    totalPages: paginationData.totalPages || 1,
+    onPageChange: p => {
+      setPage(p);
+      window.scrollTo(0, 0);
+    }
+  })) :
+  /*#__PURE__*/
+  // Empty State
+  React.createElement("div", {
+    className: "text-center py-20 bg-gray-50 rounded-xl border-dashed border-2 border-gray-200 animate-fade-in-up"
+  }, /*#__PURE__*/React.createElement("p", {
+    className: "text-gray-500 text-lg"
+  }, "\u0E44\u0E21\u0E48\u0E1E\u0E1A\u0E02\u0E49\u0E2D\u0E21\u0E39\u0E25\u0E2D\u0E35\u0E40\u0E27\u0E19\u0E15\u0E4C")), isAddEventModalOpen && /*#__PURE__*/React.createElement(AddEventModal, {
+    user: user,
+    onRefresh: getEventsData,
+    isOpen: isAddEventModalOpen,
+    jobTypeDropdown: jobTypeDropdown,
+    onClose: () => setIsAddModalOpen(false)
+  }), isClickUpdate && /*#__PURE__*/React.createElement(EditEventModal, {
+    user: user,
+    isOpen: isClickUpdate,
+    onClose: () => setIsClickUpdate(null),
+    onRefresh: getEventsData, 
+    event: isClickUpdate,
+    jobTypeDropdown: jobTypeDropdown
+  }), isTransactionModalOpen && /*#__PURE__*/React.createElement(TransactionEventModal, {
+    user: user,
+    isOpen: isTransactionModalOpen,
+    onClose: () => setIsTransactionModalOpen(null),
+    event: isTransactionModalOpen
+  }));
+};</script>

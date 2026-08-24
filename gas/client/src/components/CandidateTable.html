@@ -1,0 +1,158 @@
+<script type="text/javascript">var {
+  useState
+} = React;
+var CandidateTable = ({
+  candidates,
+  isClickDeleted,
+  isClickSelected,
+  setIsSeeMoreDetail,
+  selectedDatas,
+  setSelectedDatas,
+  user
+}) => {
+  const isAllSelected = candidates.length > 0 && selectedDatas.length === candidates.length;
+  useEffect(() => {
+    if (!isClickDeleted && !isClickSelected) {
+      setSelectedDatas([]);
+    }
+  }, [isClickDeleted, isClickSelected]);
+  const handleSelectAll = () => {
+    if (isAllSelected) {
+      setSelectedDatas([]);
+    } else {
+      setSelectedDatas(candidates);
+    }
+  };
+  const handleCheckboxClick = (e, candidate) => {
+    e.stopPropagation();
+    const isAlreadySelected = selectedDatas.some(item => item.Interview_Id === candidate.Interview_Id);
+    if (isAlreadySelected) {
+      setSelectedDatas(prev => prev.filter(item => item.Interview_Id !== candidate.Interview_Id));
+    } else {
+      setSelectedDatas(prev => [...prev, candidate]);
+    }
+  };
+  const getStatusStyle = status => {
+    switch (status) {
+      case "รอการพิจารณา":
+        return "bg-yellow-100 text-yellow-700 border-yellow-200";
+      case "ผ่าน":
+        return "bg-green-100 text-green-700 border-green-200";
+      case "ไม่ผ่าน":
+        return "bg-red-100 text-red-700 border-red-200";
+      case "ไม่ผ่านการพิจารณา":
+        return "bg-red-100 text-red-700 border-red-200";
+      case "เก็บไว้พิจารณา":
+        return "bg-gray-100 text-gray-700 border-gray-200";
+      default:
+        return "bg-yellow-100 text-yellow-700 border-yellow-200";
+    }
+  };
+  const formatCheckInTime = (ts) => {
+    if (!ts) return "-";
+    try {
+      const d = new Date(ts);
+      if (isNaN(d.getTime())) return ts;
+      return d.toLocaleString('th-TH', { 
+        hour: '2-digit', 
+        minute: '2-digit',
+        day: 'numeric',
+        month: 'short'
+      });
+    } catch(e) {
+      return ts || "-";
+    }
+  };
+  return /*#__PURE__*/React.createElement("div", {
+    className: "overflow-x-auto overflow-y-hidden shadow-md rounded-lg border border-base-200 mt-4"
+  }, /*#__PURE__*/React.createElement("table", {
+    className: "table table-zebra w-full"
+  }, /*#__PURE__*/React.createElement("thead", {
+    className: "bg-base-200 text-gray-500"
+  }, /*#__PURE__*/React.createElement("tr", {
+    className: "text-gray-500 text-sm font-normal"
+  }, isClickDeleted && /*#__PURE__*/React.createElement("td", {
+    className: "text-center"
+  }, /*#__PURE__*/React.createElement("input", {
+    type: "checkbox",
+    checked: isAllSelected,
+    onClick: handleSelectAll,
+    className: "checkbox checkbox-sm checkbox-error rounded-md"
+  })), isClickSelected && /*#__PURE__*/React.createElement("td", {
+    className: "text-center"
+  }, /*#__PURE__*/React.createElement("input", {
+    type: "checkbox",
+    checked: isAllSelected,
+    onClick: handleSelectAll,
+    className: "checkbox checkbox-sm checkbox-success rounded-md"
+  })), /*#__PURE__*/React.createElement("td", null, "\u0E2D\u0E35\u0E40\u0E27\u0E19\u0E15\u0E4C"), /*#__PURE__*/React.createElement("td", null, "\u0E0A\u0E37\u0E48\u0E2D-\u0E2A\u0E01\u0E38\u0E25"), /*#__PURE__*/React.createElement("td", null, "\u0E01\u0E32\u0E23\u0E28\u0E36\u0E01\u0E29\u0E32\u0E2A\u0E39\u0E07\u0E2A\u0E38\u0E14"), /*#__PURE__*/React.createElement("td", null, "\u0E1B\u0E23\u0E30\u0E40\u0E20\u0E17\u0E07\u0E32\u0E19\u0E17\u0E35\u0E48\u0E2A\u0E19\u0E43\u0E08"), /*#__PURE__*/React.createElement("td", null, "\u0E15\u0E33\u0E41\u0E2B\u0E19\u0E48\u0E07\u0E07\u0E32\u0E19\u0E17\u0E35\u0E48\u0E2A\u0E19\u0E43\u0E08"), /*#__PURE__*/React.createElement("td", null, "\u0E2A\u0E16\u0E32\u0E19\u0E17\u0E35\u0E48\u0E17\u0E35\u0E48\u0E2A\u0E19\u0E43\u0E08"), user && (user.role === "ADMIN" || user.role === "SUPERADMIN") && /*#__PURE__*/React.createElement("td", null, "\u0E25\u0E34\u0E07\u0E01\u0E4C\u0E2A\u0E31\u0E21\u0E20\u0E32\u0E29\u0E13\u0E4C"), /*#__PURE__*/React.createElement("td", {
+    className: "text-center"
+  }, "\u0E2A\u0E16\u0E32\u0E19\u0E30"))), /*#__PURE__*/React.createElement("tbody", null, candidates.map(candidate => {
+    const {
+      Interview_Id,
+      Fullname,
+      Highest_Education,
+      Position_Type,
+      Position_Applied,
+      Preferred_Province,
+      Interview_Link,
+      Participation_Status
+    } = candidate;
+    const {
+      Event_Name
+    } = candidate.eventDetail || {};
+    const isSelected = selectedDatas.some(item => item.Interview_Id === Interview_Id);
+    return /*#__PURE__*/React.createElement("tr", {
+      key: Interview_Id,
+      onClick: () => setIsSeeMoreDetail(candidate),
+      className: `
+                    group cursor-pointer transition-all duration-200 hover:bg-base-200
+                    ${isSelected && isClickDeleted ? "bg-red-50 hover:bg-red-50" : isSelected && isClickSelected ? "bg-green-50 hover:bg-green-50" : ""}
+                  `
+    }, isClickDeleted && /*#__PURE__*/React.createElement("td", {
+      className: "text-center"
+    }, /*#__PURE__*/React.createElement("label", {
+      onClick: e => e.stopPropagation()
+    }, /*#__PURE__*/React.createElement("input", {
+      type: "checkbox",
+      className: "checkbox checkbox-sm checkbox-error rounded-md",
+      checked: isSelected,
+      onChange: e => handleCheckboxClick(e, candidate)
+    }))), isClickSelected && /*#__PURE__*/React.createElement("td", {
+      className: "text-center"
+    }, /*#__PURE__*/React.createElement("label", {
+      onClick: e => e.stopPropagation()
+    }, /*#__PURE__*/React.createElement("input", {
+      type: "checkbox",
+      className: "checkbox checkbox-sm checkbox-success rounded-md",
+      checked: isSelected,
+      onChange: e => handleCheckboxClick(e, candidate)
+    }))), /*#__PURE__*/React.createElement("td", {
+      className: "text-sm truncate max-w-60"
+    }, Event_Name), /*#__PURE__*/React.createElement("td", {
+      className: "text-sm truncate max-w-48"
+    }, Fullname), /*#__PURE__*/React.createElement("td", {
+      className: "text-sm truncate max-w-40"
+    }, Highest_Education), /*#__PURE__*/React.createElement("td", {
+      className: "text-sm truncate max-w-40"
+    }, Position_Type), /*#__PURE__*/React.createElement("td", {
+      className: "text-sm truncate max-w-40"
+    }, Position_Applied), /*#__PURE__*/React.createElement("td", {
+      className: "text-sm"
+    }, Preferred_Province), user && (user.role === "ADMIN" || user.role === "SUPERADMIN") && /*#__PURE__*/React.createElement("td", {
+      className: "text-center"
+    }, Interview_Link && Interview_Link !== "" ? "✅ มีลิงก์" : "❌ ไม่มีลิงก์"), /*#__PURE__*/React.createElement("td", {
+      className: "md:text-nowrap text-sm text-center"
+    }, /*#__PURE__*/React.createElement("span", {
+      className: `badge badge-sm ${getStatusStyle(candidate.Status || Participation_Status)}`
+    }, candidate.Status || Participation_Status || "รอการพิจารณา")));
+  }))), isClickDeleted && selectedDatas.length > 0 && /*#__PURE__*/React.createElement("div", {
+    className: "my-2 pr-2 text-sm text-red-500 font-medium flex justify-end animate-fade-in"
+  }, /*#__PURE__*/React.createElement("i", {
+    className: "fa-solid fa-circle-check mr-2 mt-1"
+  }), "\u0E40\u0E25\u0E37\u0E2D\u0E01\u0E41\u0E25\u0E49\u0E27 ", selectedDatas.length, " \u0E23\u0E32\u0E22\u0E01\u0E32\u0E23"), isClickSelected && selectedDatas.length > 0 && /*#__PURE__*/React.createElement("div", {
+    className: "my-2 pr-2 text-sm text-green-500 font-medium flex justify-end animate-fade-in"
+  }, /*#__PURE__*/React.createElement("i", {
+    className: "fa-solid fa-circle-check mr-2 mt-1"
+  }), "\u0E40\u0E25\u0E37\u0E2D\u0E01\u0E41\u0E25\u0E49\u0E27 ", selectedDatas.length, " \u0E23\u0E32\u0E22\u0E01\u0E32\u0E23"));
+};</script>

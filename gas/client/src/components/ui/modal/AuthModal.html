@@ -1,0 +1,111 @@
+<script type="text/javascript">var {
+  useState
+} = React;
+var rolesConfig = {
+  user: {
+    id: "candidate",
+    title: "ผู้สมัคร",
+    icon: "https://drive.google.com/thumbnail?id=1INCNKnZiGOhVipsjSy62m3EamgKdoDpn",
+    textColor: "text-emerald-700"
+  },
+  manager: {
+    id: "manager",
+    title: "ผู้สัมภาษณ์",
+    icon: "https://drive.google.com/thumbnail?id=1LxpMS-U8MB14QlofD7t9vlAPQQ7hTna0",
+    textColor: "text-amber-700"
+  },
+  admin: {
+    id: "admin",
+    title: "ผู้ดูแลระบบ",
+    icon: "https://drive.google.com/thumbnail?id=1hG1dL_kmHYrU_o0DKUIs8SkbTqIYT-qg",
+    textColor: "text-red-700"
+  }
+};
+var AuthModal = ({
+  isOpen,
+  onClose,
+  onLoginSuccess
+}) => {
+  const [step, setStep] = useState("selection"); // 'selection' | 'form'
+  const [selectedRole, setSelectedRole] = useState(null);
+  const [selectedForgotPassword, setSelectedForgotPassword] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
+  useEffect(() => {
+    if (isOpen) {
+      setStep("selection");
+      setSelectedRole(null);
+    }
+  }, [isOpen]);
+  if (!isOpen) return null;
+  const handleRoleSelect = roleKey => {
+    setSelectedRole(roleKey);
+    setStep("form");
+  };
+  const handleBack = () => {
+    setStep("selection");
+    setSelectedRole(null);
+  };
+  return /*#__PURE__*/React.createElement("div", {
+    onClick: onClose,
+    className: "fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-5 transition-all"
+  }, /*#__PURE__*/React.createElement("div", {
+    onClick: e => e.stopPropagation(),
+    className: "bg-white w-full max-w-lg rounded-xl shadow-2xl overflow-hidden animate-scale-up relative flex flex-col max-h-[90vh]"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center justify-between px-6 py-4 bg-white "
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center gap-3"
+  }, step === "form" && /*#__PURE__*/React.createElement("button", {
+    onClick: handleBack,
+    className: "w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-500 transition-colors cursor-pointer"
+  }, /*#__PURE__*/React.createElement("i", {
+    className: "fa-solid fa-arrow-left"
+  })), /*#__PURE__*/React.createElement("h3", {
+    className: "font-semibold text-lg sm:text-xl text-gray-800"
+  }, "\u0E23\u0E30\u0E1A\u0E1A\u0E08\u0E2D\u0E07\u0E15\u0E32\u0E23\u0E32\u0E07\u0E2A\u0E31\u0E21\u0E20\u0E32\u0E29\u0E13\u0E4C")), /*#__PURE__*/React.createElement("button", {
+    onClick: onClose,
+    className: "w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200 text-gray-500 transition-colors cursor-pointer"
+  }, /*#__PURE__*/React.createElement("i", {
+    className: "fa-solid fa-xmark"
+  }))), /*#__PURE__*/React.createElement("div", {
+    className: `px-6 pb-6 ${isLoading ? "overflow-hidden" : "overflow-y-auto"}`
+  }, step === "selection" && /*#__PURE__*/React.createElement("div", {
+    className: "space-y-3 animate-fade-in"
+  }, /*#__PURE__*/React.createElement("p", {
+    className: "text-gray-500 text-sm mb-4 text-start"
+  }, "\u0E01\u0E23\u0E38\u0E13\u0E32\u0E40\u0E25\u0E37\u0E2D\u0E01\u0E1A\u0E17\u0E1A\u0E32\u0E17\u0E02\u0E2D\u0E07\u0E04\u0E38\u0E13\u0E40\u0E1E\u0E37\u0E48\u0E2D\u0E14\u0E33\u0E40\u0E19\u0E34\u0E19\u0E01\u0E32\u0E23\u0E15\u0E48\u0E2D"), Object.values(rolesConfig).map(role => /*#__PURE__*/React.createElement("div", {
+    key: role.id,
+    onClick: () => handleRoleSelect(role.id),
+    className: `flex items-center gap-4 p-4 rounded-xl border border-gray-200 cursor-pointer hover:shadow-md transition-all group bg-base-100 hover:bg-base-200`
+  }, /*#__PURE__*/React.createElement("img", {
+    src: role.icon,
+    alt: role.id,
+    className: "size-10 rounded-full"
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "flex-1"
+  }, /*#__PURE__*/React.createElement("h4", {
+    className: `font-semibold ${role.textColor}`
+  }, role.title), /*#__PURE__*/React.createElement("p", {
+    className: "text-xs text-gray-500"
+  }, "\u0E04\u0E25\u0E34\u0E01\u0E40\u0E1E\u0E37\u0E48\u0E2D\u0E40\u0E02\u0E49\u0E32\u0E2A\u0E39\u0E48\u0E23\u0E30\u0E1A\u0E1A")), /*#__PURE__*/React.createElement("i", {
+    className: `fa-solid fa-chevron-right text-gray-300 group-hover:text-gray-500`
+  })))), step === "form" && selectedRole === "candidate" && selectedForgotPassword === null && /*#__PURE__*/React.createElement(CandidateAuthForm, {
+    onClose: onClose,
+    onLoginSuccess: onLoginSuccess,
+    isLoading: isLoading,
+    setIsLoading: setIsLoading,
+    onClickForgotPassword: setSelectedForgotPassword
+  }), step === "form" && selectedRole === "candidate" && selectedForgotPassword === "candidate" && /*#__PURE__*/React.createElement(CandidateForgotPasswordForm, {
+    setSelectedForgotPassword: setSelectedForgotPassword
+  }), step === "form" && selectedRole === "manager" && selectedForgotPassword === null && /*#__PURE__*/React.createElement(ManagerAuthForm, {
+    onClose: onClose,
+    onLoginSuccess: onLoginSuccess,
+    isLoading: isLoading,
+    setIsLoading: setIsLoading
+  }), step === "form" && selectedRole === "admin" && selectedForgotPassword === null && /*#__PURE__*/React.createElement(AdminLoginForm, {
+    onClose: onClose,
+    onLoginSuccess: onLoginSuccess,
+    isLoading: isLoading,
+    setIsLoading: setIsLoading
+  }))));
+};</script>

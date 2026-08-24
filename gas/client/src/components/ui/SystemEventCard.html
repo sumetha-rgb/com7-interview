@@ -1,0 +1,152 @@
+<script type="text/javascript">var {
+  useHistory
+} = ReactRouterDOM;
+var SystemEventCard = ({
+  user,
+  event,
+  onEdit,
+  onDelete,
+  onTransaction
+}) => {
+  const history = useHistory();
+  // Parses server's "D/M/YYYY HH:mm:ss" Thai string explicitly — new Date()
+  // misreads it as M/D/YYYY and swaps day/month whenever day <= 12.
+  const parseThaiDateTime = str => {
+    if (!str) return null;
+    const match = String(str).trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{1,4})[,\s]+(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?/);
+    if (!match) {
+      const fallback = new Date(str);
+      return isNaN(fallback.getTime()) ? null : fallback;
+    }
+    let [, day, month, year, hour, minute, second] = match.slice(1).map(Number);
+    if (year > 2400) year -= 543;
+    return new Date(year, month - 1, day, hour, minute, second || 0);
+  };
+  const formatDate = dateString => {
+    if (!dateString) return "-";
+    const date = parseThaiDateTime(dateString) || new Date(dateString);
+    if (date.getFullYear() > 2400) date.setFullYear(date.getFullYear() - 543);
+    return date.toLocaleDateString("th-TH", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit"
+    });
+  };
+  const Icons = {
+    dots: /*#__PURE__*/React.createElement("i", {
+      className: "fa-solid fa-ellipsis-vertical text-lg"
+    }),
+    clock: /*#__PURE__*/React.createElement("i", {
+      className: "fa-regular fa-clock"
+    }),
+    mapPin: /*#__PURE__*/React.createElement("i", {
+      className: "fa-solid fa-location-dot"
+    }),
+    copy: /*#__PURE__*/React.createElement("i", {
+      className: "fa-regular fa-copy"
+    }),
+    edit: /*#__PURE__*/React.createElement("i", {
+      className: "fa-solid fa-pen-to-square"
+    }),
+    trash: /*#__PURE__*/React.createElement("i", {
+      className: "fa-solid fa-trash-can"
+    }),
+    sheet: /*#__PURE__*/React.createElement("i", {
+      className: "fa-solid fa-file-lines"
+    }),
+    creditCard: /*#__PURE__*/React.createElement("i", {
+      className: "fa-regular fa-credit-card"
+    })
+  };
+  const handleCopyLink = async () => {
+    try {
+      await navigator.clipboard.writeText(event.Sheet_Url);
+      Swal.fire({
+        icon: "success",
+        title: "คัดลอกลิงก์เรียบร้อย",
+        toast: true,
+        position: "top-end",
+        showConfirmButton: false,
+        timer: 1500
+      });
+    } catch (err) {
+      console.error("Failed to copy: ", err);
+    }
+  };
+  const handleClickCard = eventId => {
+    const params = new URLSearchParams();
+    const eventName = event.Event_Name;
+    if (eventId) params.append("eventId", eventId);
+    if (eventName) params.append("eventName", eventName);
+    history.push({
+      pathname: "/system/manage-slots",
+      search: params.toString()
+    });
+    window.scrollTo(0, 0);
+  };
+  return /*#__PURE__*/React.createElement("div", {
+    onClick: () => handleClickCard(event.Sheet_ID),
+    className: "card bg-white shadow-lg hover:shadow-xl transition-all duration-300 border border-gray-100 rounded-xl group cursor-pointer"
+  }, /*#__PURE__*/React.createElement("figure", {
+    className: "relative h-48 sm:h-56 w-full overflow-hidden"
+  }, /*#__PURE__*/React.createElement("img", {
+    src: event.Image_Url || "https://via.placeholder.com/400x200?text=No+Image",
+    alt: event.Event_Name,
+    className: "w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+  }), /*#__PURE__*/React.createElement("div", {
+    className: `absolute top-4 right-4 badge border-none rounded-full text-white font-medium shadow-sm ${event.Status ? "bg-emerald-500" : "bg-rose-500"}`
+  }, event.Status ? "Active" : "Inactive"), /*#__PURE__*/React.createElement("div", {
+    className: "absolute top-4 left-4 badge badge-ghost rounded-full bg-base-300 backdrop-blur-sm text-xs font-bold"
+  }, event.Event_Type)), /*#__PURE__*/React.createElement("div", {
+    className: "card-body p-5"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex justify-between items-start"
+  }, /*#__PURE__*/React.createElement("h2", {
+    className: "card-title text-lg font-medium line-clamp-1",
+    title: event.Event_Name
+  }, event.Event_Name), /*#__PURE__*/React.createElement("div", {
+    onClick: e => e.stopPropagation(),
+    className: "dropdown dropdown-bottom dropdown-end relative"
+  }, /*#__PURE__*/React.createElement("label", {
+    tabIndex: 0,
+    className: "btn btn-ghost btn-circle btn-sm h-8 w-8 min-h-0"
+  }, Icons.dots), /*#__PURE__*/React.createElement("ul", {
+    tabIndex: 0,
+    className: "dropdown-content z-50 menu p-2 shadow-lg bg-base-100 rounded-box w-52 border border-gray-100 absolute top-full right-0 mt-1"
+  }, /*#__PURE__*/React.createElement("li", null, /*#__PURE__*/React.createElement("a", {
+    onClick: handleCopyLink,
+    className: "gap-3"
+  }, Icons.copy, " \u0E04\u0E31\u0E14\u0E25\u0E2D\u0E01\u0E25\u0E34\u0E07\u0E01\u0E4C")), /*#__PURE__*/React.createElement("li", null, /*#__PURE__*/React.createElement("a", {
+    onClick: () => onEdit(event),
+    className: "gap-3"
+  }, Icons.edit, " \u0E41\u0E01\u0E49\u0E44\u0E02\u0E02\u0E49\u0E2D\u0E21\u0E39\u0E25")), /*#__PURE__*/React.createElement("li", null, /*#__PURE__*/React.createElement("a", {
+    href: event.Sheet_Url,
+    target: "_blank",
+    rel: "noopener noreferrer",
+    className: "gap-3"
+  }, Icons.sheet, " \u0E14\u0E39 Google Sheet")), /*#__PURE__*/React.createElement("li", null, /*#__PURE__*/React.createElement("a", {
+    onClick: () => onTransaction(event),
+    className: "gap-3"
+  }, Icons.creditCard, " Transaction")), /*#__PURE__*/React.createElement("div", {
+    className: "divider my-1"
+  }), /*#__PURE__*/React.createElement("li", null, /*#__PURE__*/React.createElement("a", {
+    onClick: () => onDelete(event),
+    className: "gap-3 text-rose-500 hover:bg-rose-50"
+  }, Icons.trash, " \u0E25\u0E1A\u0E2D\u0E35\u0E40\u0E27\u0E19\u0E15\u0E4C"))))), /*#__PURE__*/React.createElement("div", {
+    className: "space-y-2 mt-2 text-sm text-gray-600"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-start gap-2"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "mt-0.5 text-emerald-600"
+  }, Icons.clock), /*#__PURE__*/React.createElement("div", {
+    className: "flex flex-col"
+  }, /*#__PURE__*/React.createElement("span", null, "\u0E40\u0E23\u0E34\u0E48\u0E21: ", formatDate(event.Opening_At)), /*#__PURE__*/React.createElement("span", null, "\u0E2A\u0E34\u0E49\u0E19\u0E2A\u0E38\u0E14: ", formatDate(event.Closing_At)))), event.Location && /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center gap-2"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "text-rose-500"
+  }, Icons.mapPin), /*#__PURE__*/React.createElement("span", {
+    className: "line-clamp-1"
+  }, event.Location)))));
+};</script>

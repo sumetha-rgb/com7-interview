@@ -1,0 +1,74 @@
+<script type="text/javascript">var {
+  useState,
+  useEffect
+} = React;
+var JobHiringPage = () => {
+  const [images, setImages] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const fetchImages = () => {
+    setIsLoading(true);
+    google.script.run.withSuccessHandler(res => {
+      if (res) {
+        setImages(res);
+        setIsLoading(false);
+      } else {
+        setImages([]);
+        setIsLoading(false);
+      }
+    }).getAllJobHiringPosterUrl();
+  };
+  useEffect(() => {
+    fetchImages();
+  }, []);
+  const getDisplayUrl = driveUrl => {
+    if (!driveUrl) return "";
+    if (driveUrl.includes("drive.google.com/uc?export=view")) {
+      const idMatch = driveUrl.match(/id=([^&]+)/);
+      if (idMatch && idMatch[1]) {
+        return `https://drive.google.com/thumbnail?sz=w1000&id=${idMatch[1]}`;
+      }
+    }
+    return driveUrl;
+  };
+  const openInNewTab = url => {
+    window.open(url, "_blank", "noopener,noreferrer");
+  };
+  return /*#__PURE__*/React.createElement("div", {
+    className: "w-full flex flex-col"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex flex-col items-center py-20 bg-base-200 padding-container gap-4 sm:gap-8"
+  }, /*#__PURE__*/React.createElement(Header, {
+    title: "\u0E15\u0E33\u0E41\u0E2B\u0E19\u0E48\u0E07\u0E07\u0E32\u0E19\u0E17\u0E35\u0E48\u0E40\u0E1B\u0E34\u0E14\u0E23\u0E31\u0E1A\u0E2A\u0E21\u0E31\u0E04\u0E23",
+    subTitle: "\u0E40\u0E25\u0E37\u0E2D\u0E01\u0E15\u0E33\u0E41\u0E2B\u0E19\u0E48\u0E07\u0E17\u0E35\u0E48\u0E40\u0E2B\u0E21\u0E32\u0E30\u0E01\u0E31\u0E1A\u0E04\u0E38\u0E13 \u0E41\u0E25\u0E49\u0E27\u0E2A\u0E21\u0E31\u0E04\u0E23\u0E44\u0E14\u0E49\u0E40\u0E25\u0E22!"
+  })), /*#__PURE__*/React.createElement("div", {
+    className: "padding-container pt-10"
+  }, isLoading ? /*#__PURE__*/React.createElement("div", {
+    className: "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-fade-in-up"
+  }, [...Array(3)].map((_, i) => /*#__PURE__*/React.createElement("div", {
+    key: i,
+    className: "flex flex-col gap-4 w-full animate-pulse"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "skeleton h-48 w-full rounded-xl"
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "skeleton h-4 w-28"
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "skeleton h-4 w-full"
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "skeleton h-4 w-full"
+  })))) : /*#__PURE__*/React.createElement("div", {
+    className: "space-y-6 max-w-7xl xl:max-w-[1440px] mx-auto animate-fade-in-up"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: `grid gap-4 px-1 ${images.length === 1 ? "grid-cols-1" : images.length === 2 ? "grid-cols-1 sm:grid-cols-2" : "grid-cols-1 sm:grid-cols-2 md:grid-cols-3"}`
+  }, images.map((item, index) => /*#__PURE__*/React.createElement("div", {
+    key: index,
+    onClick: () => openInNewTab(item.Url),
+    className: "group relative bg-white rounded-xl shadow-md hover:shadow-xl transition-all duration-300 overflow-hidden border border-gray-100"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "w-full overflow-hidden aspect-[7/10] bg-gray-100 relative"
+  }, /*#__PURE__*/React.createElement("img", {
+    src: getDisplayUrl(item.Url),
+    alt: item.File_Name,
+    className: "w-full h-auto object-cover transform group-hover:scale-105 transition-transform duration-500",
+    loading: "lazy"
+  }))))))));
+};</script>

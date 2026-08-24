@@ -1,0 +1,324 @@
+<script type="text/javascript">var {
+  useState,
+  useEffect,
+  useMemo
+} = React;
+var {
+  useHistory
+} = ReactRouterDOM;
+var parseThaiDate = dateStr => {
+  if (!dateStr) return null;
+  const parts = dateStr.split("/");
+  if (parts.length !== 3) return null;
+  const [day, month, thaiYear] = parts;
+  const gregorianYear = parseInt(thaiYear, 10) - 543;
+  const m = parseInt(month, 10) - 1;
+  const d = parseInt(day, 10);
+  const date = new Date(gregorianYear, m, d);
+  if (isNaN(date.getTime())) return null;
+  return date;
+};
+
+// --- Helper: Convert JS Date back to "17/2/2569" (for matching data) ---
+var formatToThaiDate = dateObj => {
+  if (!dateObj) return "";
+  const d = new Date(dateObj);
+  const day = d.getDate();
+  const month = d.getMonth() + 1;
+  const thaiYear = d.getFullYear() + 543;
+  return `${day}/${month}/${thaiYear}`;
+};
+
+// Fixed shop names for ONLINE events — must match Bu_Name values in Slots sheet exactly.
+var ONLINE_SHOP_OPTIONS = ["True", "Studio7", "BaNaNa","Dtac"];
+var PROVINCE_CACHE_KEY = "thai_province_data";
+var PROVINCE_API_URL = "https://raw.githubusercontent.com/kongvut/thai-province-data/refs/heads/master/api/latest/province.json";
+var EventBookingForm = ({
+  events = [],
+  isLoading,
+  user,
+  onClickLogin
+}) => {
+  const [selectedEventId, setSelectedEventId] = useState("");
+  const [selectJobType, setSelectJobType] = useState("");
+  const [selectedBuName, setSelectedBuName] = useState("");
+  const [selectedProvince, setSelectedProvince] = useState(""); // ONLINE only
+  const [provinceOptions, setProvinceOptions] = useState([]);
+  const [isLoadingProvinces, setIsLoadingProvinces] = useState(false);
+  const [selectedDate, setSelectedDate] = useState("");
+  const [flatpickrDate, setFlatpickrDate] = useState(null);
+  const [selectedSlotId, setSelectedSlotId] = useState("");
+  const history = useHistory();
+
+  // --- Derived Data ---
+
+  const currentEvent = useMemo(() => events.find(event => event.eventId === selectedEventId), [events, selectedEventId]);
+
+  // O(1) flag — no memoization needed.
+  const isOnline = currentEvent?.eventType === "ONLINE";
+
+  // For ONLINE: slot filtering uses the BU region derived from the selected province.
+  // For ONSITE: slot filtering uses the selected branch/region directly.
+  const selectedRegion = getRegionByProvince(selectedProvince);
+  const effectiveBuName = isOnline ? selectedRegion : selectedBuName;
+
+  // BU names extracted from slot data — used as options for ONSITE.
+  const availableBuNames = useMemo(() => {
+    if (!currentEvent) return [];
+    const buSet = new Set();
+    currentEvent.slots.forEach(slot => {
+      slot.bus.forEach(bu => {
+        if (bu.buName) buSet.add(bu.buName.trim());
+      });
+    });
+    return Array.from(buSet).sort();
+  }, [currentEvent]);
+
+  // Second-field options:
+  //   ONLINE → fixed shop list
+  //   ONSITE → derived from slot data
+  const buOptions = isOnline ? ONLINE_SHOP_OPTIONS : availableBuNames;
+
+  // Available Dates — ONLINE filters by BU region (from province); ONSITE by selected branch.
+  const availableDates = useMemo(() => {
+    if (!currentEvent || !effectiveBuName) return [];
+    const validSlots = currentEvent.slots.filter(slot => slot.bus.some(bu => bu.buName === effectiveBuName));
+    const datesSet = new Set();
+    validSlots.forEach(slot => {
+      datesSet.add(slot.date);
+    });
+    return Array.from(datesSet).sort();
+  }, [currentEvent, effectiveBuName]);
+
+  // Date Config — min/max/enable for Flatpickr
+  const dateConfig = useMemo(() => {
+    if (!availableDates || availableDates.length === 0) return {
+      min: null,
+      max: null,
+      enable: []
+    };
+    const dateObjs = availableDates.map(date => parseThaiDate(date)).filter(d => d !== null);
+    if (dateObjs.length === 0) return {
+      min: null,
+      max: null,
+      enable: []
+    };
+    dateObjs.sort((a, b) => a - b);
+    return {
+      min: dateObjs[0],
+      max: dateObjs[dateObjs.length - 1],
+      enable: dateObjs
+    };
+  }, [availableDates]);
+
+  // Available Times — slots matching both effectiveBuName and selected date
+  const availableTimes = useMemo(() => {
+    if (!currentEvent || !effectiveBuName || !selectedDate) return [];
+    return currentEvent.slots.filter(slot => {
+      const isDateMatch = slot.date === selectedDate;
+      const hasBuMatch = slot.bus.some(bu => bu.buName === effectiveBuName);
+      return isDateMatch && hasBuMatch;
+    });
+  }, [currentEvent, effectiveBuName, selectedDate]);
+
+  // Specific allocationId (UUID) for the effectiveBuName within the selected slot
+  const finalBuId = useMemo(() => {
+    if (!selectedSlotId || !effectiveBuName) return null;
+    const slot = availableTimes.find(slot => slot.slotId === selectedSlotId);
+    if (!slot) return null;
+    const targetBU = slot.bus.find(bu => bu.buName === effectiveBuName);
+    return targetBU ? targetBU.allocationId : null;
+  }, [availableTimes, selectedSlotId, effectiveBuName]);
+
+  // --- Province API ---
+
+  const fetchProvinces = async () => {
+    // Return from sessionStorage cache if available (shared across pages in same session)
+    const cached = sessionStorage.getItem(PROVINCE_CACHE_KEY);
+    if (cached) {
+      setProvinceOptions(JSON.parse(cached));
+      return;
+    }
+    setIsLoadingProvinces(true);
+    try {
+      const res = await fetch(PROVINCE_API_URL);
+      const data = await res.json();
+      const names = data.map(p => p.name_th).filter(Boolean).sort((a, b) => a.localeCompare(b, "th"));
+      sessionStorage.setItem(PROVINCE_CACHE_KEY, JSON.stringify(names));
+      setProvinceOptions(names);
+    } catch (err) {
+      console.error("Failed to fetch province data:", err);
+    } finally {
+      setIsLoadingProvinces(false);
+    }
+  };
+
+  // --- Effects ---
+
+  // Sync job type whenever the selected event changes.
+  useEffect(() => {
+    if (currentEvent?.eventJobType) {
+      setSelectJobType(currentEvent.eventJobType);
+    } else {
+      setSelectJobType("");
+    }
+  }, [currentEvent]);
+
+  // Lazy-load provinces only when an ONLINE event is selected.
+  // sessionStorage cache means this network call fires at most once per browser session.
+  useEffect(() => {
+    if (isOnline && provinceOptions.length === 0) {
+      fetchProvinces();
+    }
+  }, [isOnline]);
+
+  // --- Handlers ---
+
+  const handleEventChange = event => {
+    setSelectedEventId(event.target.value);
+    setSelectedBuName("");
+    setSelectedProvince("");
+    setSelectedDate("");
+    setFlatpickrDate(null);
+    setSelectedSlotId("");
+  };
+  const handleBuChange = event => {
+    setSelectedBuName(event.target.value);
+    setSelectedDate("");
+    setFlatpickrDate(null);
+    setSelectedSlotId("");
+  };
+  const handleDateChange = dateStr => {
+    if (dateStr) {
+      setFlatpickrDate(dateStr);
+      setSelectedDate(formatToThaiDate(new Date(dateStr)));
+    } else {
+      setFlatpickrDate(null);
+      setSelectedDate("");
+    }
+  };
+  const handleSubmit = e => {
+    e.preventDefault();
+    if (!user) {
+      onClickLogin();
+      return;
+    }
+    const isMissingRequired = !selectedEventId || !selectedBuName || !selectedSlotId || !finalBuId || !currentEvent || isOnline && !selectedProvince;
+    if (isMissingRequired) {
+      Swal.fire({
+        icon: "warning",
+        title: "กรุณากรอกข้อมูลให้ครบ",
+        timer: 2000
+      });
+      return;
+    }
+    const params = new URLSearchParams();
+    if (selectedEventId) params.append("eventId", selectedEventId);
+    if (selectJobType) params.append("eventJobType", selectJobType);
+    if (finalBuId) params.append("slotId", finalBuId);
+    if (currentEvent) params.append("eventName", currentEvent.eventName);
+    if (selectedBuName) params.append("buName", effectiveBuName);
+    if (isOnline && selectedBuName) params.append("shop", selectedBuName);
+    if (isOnline && selectedProvince) params.append("preferredProvince", selectedProvince);
+    if (selectedSlotId) {
+      const [date, startTime, endTime] = selectedSlotId.split("_");
+      const timePeriod = `${startTime}-${endTime}`;
+      const thaiDateStr = parseThaiDate(date).toLocaleString("th-TH", {
+        year: "numeric",
+        month: "long",
+        day: "numeric"
+      });
+      params.append("date", thaiDateStr);
+      params.append("time", timePeriod);
+    }
+    history.push({
+      pathname: "/interview/add",
+      search: params.toString()
+    });
+    window.scrollTo(0, 0);
+  };
+  return /*#__PURE__*/React.createElement("form", {
+    onSubmit: handleSubmit,
+    className: "w-full bg-base-100 py-6 px-6 lg:px-12 rounded-lg shadow-md gap-4 lg:gap-6"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: `w-full grid grid-cols-1 md:grid-cols-2 gap-4 ${isOnline ? "lg:grid-cols-5" : "lg:grid-cols-4"}`
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "w-full"
+  }, /*#__PURE__*/React.createElement("label", {
+    className: "text-sm font-medium text-gray-500 mb-1.5 ml-1 block"
+  }, "\u0E40\u0E25\u0E37\u0E2D\u0E01\u0E2D\u0E35\u0E40\u0E27\u0E19\u0E15\u0E4C"), /*#__PURE__*/React.createElement("select", {
+    className: "select select-bordered w-full",
+    value: selectedEventId,
+    onChange: handleEventChange,
+    disabled: isLoading
+  }, /*#__PURE__*/React.createElement("option", {
+    value: "",
+    disabled: true
+  }, "\u0E40\u0E25\u0E37\u0E2D\u0E01\u0E01\u0E34\u0E08\u0E01\u0E23\u0E23\u0E21"), events.map(e => /*#__PURE__*/React.createElement("option", {
+    key: e.eventId,
+    value: e.eventId
+  }, e.eventName)))), /*#__PURE__*/React.createElement("div", {
+    className: "w-full"
+  }, /*#__PURE__*/React.createElement("label", {
+    className: "text-sm font-medium text-gray-500 mb-1.5 ml-1 block"
+  }, isOnline ? "เลือก Shop ที่ต้องการ" : "เลือกสาขา/ภูมิภาค"), /*#__PURE__*/React.createElement("select", {
+    className: "select select-bordered w-full",
+    value: selectedBuName,
+    onChange: handleBuChange,
+    disabled: !selectedEventId
+  }, /*#__PURE__*/React.createElement("option", {
+    value: "",
+    disabled: true
+  }, isOnline ? "เลือก Shop" : "เลือกสาขา/ภูมิภาค"), buOptions.map(name => /*#__PURE__*/React.createElement("option", {
+    key: name,
+    value: name
+  }, name)))), isOnline && /*#__PURE__*/React.createElement("div", {
+    className: "w-full"
+  }, /*#__PURE__*/React.createElement(SearchableSelect, {
+    name: "preferredProvince",
+    label: "\u0E08\u0E31\u0E07\u0E2B\u0E27\u0E31\u0E14\u0E17\u0E35\u0E48\u0E15\u0E49\u0E2D\u0E07\u0E01\u0E32\u0E23",
+    value: selectedProvince,
+    onChange: e => setSelectedProvince(e.target.value),
+    options: provinceOptions,
+    disabled: !selectedEventId || isLoadingProvinces,
+    placeholder: isLoadingProvinces ? "กำลังโหลด..." : "พิมพ์เพื่อค้นหาจังหวัด"
+  })), /*#__PURE__*/React.createElement("div", {
+    className: "w-full"
+  }, /*#__PURE__*/React.createElement("label", {
+    className: "text-sm font-medium text-gray-500 mb-1.5 ml-1 block"
+  }, "\u0E40\u0E25\u0E37\u0E2D\u0E01\u0E27\u0E31\u0E19\u0E17\u0E35\u0E48"), /*#__PURE__*/React.createElement(FlatpickrInput, {
+    key: effectiveBuName,
+    value: flatpickrDate,
+    onChange: handleDateChange,
+    options: {
+      dateFormat: "Y-m-d",
+      minDate: dateConfig.min,
+      maxDate: dateConfig.max,
+      enable: dateConfig.enable,
+      disableMobile: true
+    },
+    disabled: !effectiveBuName
+  })), /*#__PURE__*/React.createElement("div", {
+    className: "w-full"
+  }, /*#__PURE__*/React.createElement("label", {
+    className: "text-sm font-medium text-gray-500 mb-1.5 ml-1 block"
+  }, "\u0E40\u0E25\u0E37\u0E2D\u0E01\u0E0A\u0E48\u0E27\u0E07\u0E40\u0E27\u0E25\u0E32"), /*#__PURE__*/React.createElement("select", {
+    className: "select select-bordered w-full",
+    value: selectedSlotId,
+    onChange: e => setSelectedSlotId(e.target.value),
+    disabled: !selectedDate
+  }, /*#__PURE__*/React.createElement("option", {
+    value: "",
+    disabled: true
+  }, "\u0E40\u0E25\u0E37\u0E2D\u0E01\u0E40\u0E27\u0E25\u0E32"), availableTimes.map(slot => /*#__PURE__*/React.createElement("option", {
+    key: slot.slotId,
+    value: slot.slotId
+  }, slot.startTime, " - ", slot.endTime))))), /*#__PURE__*/React.createElement("div", {
+    className: "mt-6 w-full flex justify-center"
+  }, /*#__PURE__*/React.createElement("button", {
+    type: "submit",
+    className: "w-full flex items-center justify-center gap-2 text-nowrap bg-emerald-600 text-white rounded-box px-6 py-2.5 transform transition-all duration-300 hover:bg-emerald-500 cursor-pointer font-normal"
+  }, /*#__PURE__*/React.createElement("i", {
+    className: "fa-solid fa-magnifying-glass text-sm"
+  }), /*#__PURE__*/React.createElement("p", null, "\u0E04\u0E49\u0E19\u0E2B\u0E32\u0E2D\u0E35\u0E40\u0E27\u0E19\u0E15\u0E4C"))));
+};</script>

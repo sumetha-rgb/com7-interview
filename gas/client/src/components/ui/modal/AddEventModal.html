@@ -1,0 +1,208 @@
+<script type="text/javascript">var {
+  useState
+} = React;
+var AddEventModal = ({
+  user,
+  isOpen,
+  onClose,
+  onRefresh,
+  jobTypeDropdown
+}) => {
+  const [formData, setFormData] = useState({
+    eventName: "",
+    openingDate: "",
+    openingTime: "09:00",
+    closingDate: "",
+    closingTime: "18:00",
+    location: "",
+    type: "",
+    jobType: "",
+    userRole: user.role
+  });
+  const [isLoading, setIsLoading] = useState(false);
+  if (!isOpen) return null;
+  const handleChange = e => {
+    const {
+      name,
+      value
+    } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  // รัยค่าจาก Flatpickr
+  const handleDateChange = (field, value) => {
+    setFormData(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
+  const handleSubmit = e => {
+    e.preventDefault();
+    setIsLoading(true);
+    google.script.run.withSuccessHandler(res => {
+      if (res.success === true) {
+        onClose();
+        onRefresh();
+        Swal.fire({
+          icon: "success",
+          title: res.message
+        });
+      } else {
+        Swal.fire({
+          icon: "error",
+          title: res.message
+        });
+      }
+      setIsLoading(false);
+    }).createEvent(formData);
+  };
+  return /*#__PURE__*/React.createElement("div", {
+    className: "fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "absolute inset-0 bg-black/60 transition-opacity",
+    onClick: onClose
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "bg-white w-full max-w-md mx-auto rounded-lg shadow-lg z-50 overflow-y-auto animate-fade-in-up"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex justify-between items-center p-4 border-b border-gray-200 rounded-t-lg"
+  }, /*#__PURE__*/React.createElement("h2", {
+    className: "text-lg font-medium"
+  }, "\u0E40\u0E1E\u0E34\u0E48\u0E21\u0E2D\u0E35\u0E40\u0E27\u0E19\u0E15\u0E4C\u0E43\u0E2B\u0E21\u0E48"), /*#__PURE__*/React.createElement("button", {
+    onClick: onClose,
+    className: "btn btn-circle btn-ghost group"
+  }, /*#__PURE__*/React.createElement("i", {
+    className: "fa-solid fa-xmark text-gray-500 group-hover:text-gray-700 duration-200"
+  }))), /*#__PURE__*/React.createElement("div", {
+    className: "p-4 overflow-y-auto custom-scrollbar"
+  }, /*#__PURE__*/React.createElement("form", {
+    id: "eventForm",
+    onSubmit: handleSubmit,
+    className: "grid grid-cols-1 sm:grid-cols-2 gap-3"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "sm:col-span-2 form-control"
+  }, /*#__PURE__*/React.createElement("label", {
+    className: "label"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "label-text font-medium"
+  }, "\u0E0A\u0E37\u0E48\u0E2D\u0E07\u0E32\u0E19\u0E2D\u0E35\u0E40\u0E27\u0E19\u0E15\u0E4C ", /*#__PURE__*/React.createElement("span", {
+    className: "text-red-500"
+  }, "*"))), /*#__PURE__*/React.createElement("input", {
+    type: "text",
+    name: "eventName",
+    value: formData.eventName,
+    onChange: handleChange,
+    placeholder: "\u0E40\u0E0A\u0E48\u0E19 JobFair 2026",
+    className: "input input-bordered w-full",
+    required: true
+  })), /*#__PURE__*/React.createElement(FlatpickrInput, {
+    label: "\u0E27\u0E31\u0E19\u0E17\u0E35\u0E48\u0E40\u0E23\u0E34\u0E48\u0E21\u0E07\u0E32\u0E19",
+    value: formData.openingDate,
+    onChange: val => handleDateChange("openingDate", val),
+    icon: /*#__PURE__*/React.createElement("i", {
+      className: "fa-regular fa-calendar"
+    }),
+    placeholder: "\u0E40\u0E25\u0E37\u0E2D\u0E01\u0E27\u0E31\u0E19\u0E17\u0E35\u0E48",
+    options: {
+      dateFormat: "Y-m-d",
+      minDate: "today"
+    }
+  }), /*#__PURE__*/React.createElement(FlatpickrInput, {
+    label: "\u0E40\u0E27\u0E25\u0E32\u0E40\u0E23\u0E34\u0E48\u0E21",
+    value: formData.openingTime,
+    onChange: val => handleDateChange("openingTime", val),
+    icon: /*#__PURE__*/React.createElement("i", {
+      className: "fa-regular fa-clock"
+    }),
+    placeholder: "09:00",
+    options: {
+      enableTime: true,
+      noCalendar: true,
+      dateFormat: "H:i",
+      time_24hr: true
+    }
+  }), /*#__PURE__*/React.createElement(FlatpickrInput, {
+    label: "\u0E27\u0E31\u0E19\u0E17\u0E35\u0E48\u0E2A\u0E34\u0E49\u0E19\u0E2A\u0E38\u0E14",
+    value: formData.closingDate,
+    onChange: val => handleDateChange("closingDate", val),
+    icon: /*#__PURE__*/React.createElement("i", {
+      className: "fa-regular fa-calendar-check"
+    }),
+    placeholder: "\u0E40\u0E25\u0E37\u0E2D\u0E01\u0E27\u0E31\u0E19\u0E17\u0E35\u0E48",
+    options: {
+      dateFormat: "Y-m-d",
+      minDate: formData.openingDate || "today"
+    }
+  }), /*#__PURE__*/React.createElement(FlatpickrInput, {
+    label: "\u0E40\u0E27\u0E25\u0E32\u0E2A\u0E34\u0E49\u0E19\u0E2A\u0E38\u0E14",
+    value: formData.closingTime,
+    onChange: val => handleDateChange("closingTime", val),
+    icon: /*#__PURE__*/React.createElement("i", {
+      className: "fa-regular fa-clock"
+    }),
+    placeholder: "18:00",
+    options: {
+      enableTime: true,
+      noCalendar: true,
+      dateFormat: "H:i",
+      time_24hr: true
+    }
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "sm:col-span-2 form-control"
+  }, /*#__PURE__*/React.createElement("label", {
+    className: "label"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "label-text font-medium"
+  }, "\u0E1B\u0E23\u0E30\u0E40\u0E20\u0E17\u0E07\u0E32\u0E19")), /*#__PURE__*/React.createElement("select", {
+    name: "type",
+    value: formData.type,
+    onChange: handleChange,
+    className: "select select-bordered w-full"
+  }, /*#__PURE__*/React.createElement("option", {
+    value: ""
+  }, "-- \u0E40\u0E25\u0E37\u0E2D\u0E01\u0E1B\u0E23\u0E30\u0E40\u0E20\u0E17 --"), /*#__PURE__*/React.createElement("option", {
+    value: "ONSITE"
+  }, "ONSITE"), /*#__PURE__*/React.createElement("option", {
+    value: "ONLINE"
+  }, "ONLINE"))), formData.type === "ONSITE" && /*#__PURE__*/React.createElement("div", {
+    className: "sm:col-span-2 form-control"
+  }, /*#__PURE__*/React.createElement("label", {
+    className: "label"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "label-text font-medium"
+  }, "\u0E2A\u0E16\u0E32\u0E19\u0E17\u0E35\u0E48\u0E08\u0E31\u0E14\u0E07\u0E32\u0E19")), /*#__PURE__*/React.createElement("input", {
+    type: "text",
+    name: "location",
+    value: formData.location,
+    onChange: handleChange,
+    placeholder: "\u0E23\u0E30\u0E1A\u0E38\u0E2A\u0E16\u0E32\u0E19\u0E17\u0E35\u0E48",
+    className: "input input-bordered w-full"
+  })), /*#__PURE__*/React.createElement("div", {
+    className: "sm:col-span-2 form-control"
+  }, /*#__PURE__*/React.createElement("label", {
+    className: "label"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "label-text font-medium"
+  }, "\u0E1B\u0E23\u0E30\u0E40\u0E20\u0E17\u0E02\u0E2D\u0E07\u0E15\u0E33\u0E41\u0E2B\u0E19\u0E48\u0E07\u0E07\u0E32\u0E19")), /*#__PURE__*/React.createElement("select", {
+    name: "jobType",
+    value: formData.jobType,
+    onChange: handleChange,
+    className: "select select-bordered w-full"
+  }, /*#__PURE__*/React.createElement("option", {
+    value: ""
+  }, "-- \u0E40\u0E25\u0E37\u0E2D\u0E01\u0E1B\u0E23\u0E30\u0E40\u0E20\u0E17\u0E02\u0E2D\u0E07\u0E15\u0E33\u0E41\u0E2B\u0E19\u0E48\u0E07\u0E07\u0E32\u0E19 --"), jobTypeDropdown.map(item => /*#__PURE__*/React.createElement("option", {
+    key: item.name,
+    value: item.name
+  }, item.name)))), /*#__PURE__*/React.createElement("div", {
+    className: "sm:col-span-2"
+  }, /*#__PURE__*/React.createElement("button", {
+    type: "submit",
+    form: "eventForm",
+    disabled: isLoading,
+    className: "w-full btn bg-emerald-600 hover:bg-emerald-500 text-white shadow-md border-none px-6 rounded-lg duration-200 transition-all"
+  }, isLoading ? /*#__PURE__*/React.createElement("span", {
+    className: "loading loading-spinner"
+  }) : "เพิ่มอีเวนต์"))))));
+};</script>

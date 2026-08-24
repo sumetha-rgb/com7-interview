@@ -1,0 +1,202 @@
+<script type="text/javascript">var {
+  useState
+} = React;
+var {
+  useLocation,
+  Link
+} = ReactRouterDOM;
+var Sidebar = ({
+  user,
+  setUser,
+  onLogout,
+  children
+}) => {
+  const location = useLocation();
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(true);
+  const isSuperAdmin = user && (user.role === "SUPERADMIN" || user.role === "ADMIN");
+  const sideBarItems = [{
+    name: "หน้าหลัก",
+    path: "/",
+    icon: "fa-solid fa-house"
+  }, {
+    name: "แดชบอร์ด",
+    path: "/system",
+    icon: "fa-solid fa-chart-line"
+  }, {
+    name: "จัดการผู้ใช้งาน (TA)",
+    path: "/system/manage-ta",
+    icon: "fa-solid fa-users"
+  }, {
+    name: "จัดการผู้สัมภาษณ์ (Manager)",
+    path: "/system/manage-manager",
+    icon: "fa-solid fa-building-user"
+  }, {
+    name: "จัดการอีเวนต์",
+    path: "/system/manage-events",
+    icon: "fa-solid fa-calendar-days"
+  }, {
+    name: "จัดการตำแหน่งงานว่าง",
+    path: "/system/manage-job-hiring",
+    icon: "fa-solid fa-images"
+  }, {
+    name: "ฐานข้อมูลผู้สมัคร",
+    path: "/system/pool-candidate",
+    icon: "fa-solid fa-list"
+  }, {
+    name: "แนบลิงก์สัมภาษณ์",
+    path: "/system/add-link",
+    icon: "fa-solid fa-link"
+  }, ...(isSuperAdmin ? [{
+    name: "ระบบจัดการคิว",
+    path: "/system/queue",
+    icon: "fa-solid fa-list-ol"
+
+  }] : [])];
+  const toggleSidebar = () => setIsSidebarOpen(!isSidebarOpen);
+  const toggleExpand = () => setIsExpanded(!isExpanded);
+  return /*#__PURE__*/React.createElement("div", {
+    className: "drawer lg:drawer-open bg-base-200 min-h-screen font-sans antialiased"
+  }, /*#__PURE__*/React.createElement("input", {
+    id: "my-drawer-4",
+    type: "checkbox",
+    className: "drawer-toggle",
+    checked: isSidebarOpen,
+    onChange: toggleSidebar
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "drawer-content flex flex-col transition-all duration-300"
+  }, /*#__PURE__*/React.createElement("nav", {
+    className: "navbar flex items-center justify-between gap-4 bg-base-100 border-b border-base-300 sticky top-0 z-30 px-4 sm:px-6"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex-none lg:hidden"
+  }, /*#__PURE__*/React.createElement("label", {
+    htmlFor: "my-drawer-4",
+    "aria-label": "open sidebar",
+    className: "btn btn-square btn-ghost text-slate-500 hover:text-emerald-600 hover:bg-emerald-50"
+  }, /*#__PURE__*/React.createElement("i", {
+    className: "fa-solid fa-bars text-xl"
+  }))), /*#__PURE__*/React.createElement("div", {
+    className: "block"
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: toggleExpand,
+    className: `btn btn-ghost btn-sm`
+  }, /*#__PURE__*/React.createElement("i", {
+    className: `fa-solid fa-angles-right text-gray-500 text-sm ${isExpanded ? "rotate-180" : ""}`
+  }))), /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center gap-2"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "text-right hidden sm:block"
+  }, /*#__PURE__*/React.createElement("p", {
+    className: "text-sm font-semibold text-slate-700"
+  }, user?.name || "ผู้ใช้งาน"), /*#__PURE__*/React.createElement("p", {
+    className: "text-xs text-slate-500"
+  }, user.role === "ADMIN" ? "Admin Role" : "Superadmin Role")), /*#__PURE__*/React.createElement("div", {
+    className: "avatar placeholder"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "bg-emerald-600 text-neutral-content rounded-full w-10 ring ring-emerald-100 ring-offset-2 flex items-center justify-center"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "text-lg font-bold"
+  }, (user?.name || "U").charAt(0).toUpperCase()))))), /*#__PURE__*/React.createElement("main", {
+    className: "px-4 pt-10 md:px-10 flex-1 bg-base-100 border border-base-300"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "max-w-7xl xl:max-w-[1440px] mx-auto"
+  }, children))), /*#__PURE__*/React.createElement("div", {
+    className: "drawer-side z-40"
+  }, /*#__PURE__*/React.createElement("label", {
+    htmlFor: "my-drawer-4",
+    "aria-label": "close sidebar",
+    className: "drawer-overlay",
+    onClick: toggleSidebar
+  }), /*#__PURE__*/React.createElement("aside", {
+    className: `
+              min-h-full bg-base-100 text-base-content flex flex-col border-r border-base-300 shadow-xl
+              transition-all duration-300 ease-in-out
+              ${isExpanded ? "w-68" : "w-20"} 
+            `
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "h-16 flex items-center justify-center px-4 border-b border-base-300 relative"
+  }, /*#__PURE__*/React.createElement(Link, {
+    to: "/",
+    className: `flex items-center justify-center w-full transition-all duration-300 cursor-pointer hover:scale-110 ${!isExpanded && "opacity-0 hidden"}`
+  }, /*#__PURE__*/React.createElement("img", {
+    src: "https://companieslogo.com/img/orig/COM7.BK_BIG-1d5f8726.png?t=1720244491",
+    alt: "logo",
+    className: "h-8"
+  })), !isExpanded && /*#__PURE__*/React.createElement("div", {
+    className: "avatar"
+  }, /*#__PURE__*/React.createElement(Link, {
+    to: "/",
+    className: "w-8 rounded-full"
+  }, /*#__PURE__*/React.createElement("img", {
+    src: "https://companieslogo.com/img/orig/COM7.BK-7f86e1ae.png?t=1720244491",
+    alt: "com-logo"
+  })))), /*#__PURE__*/React.createElement("ul", {
+    className: "w-full menu p-2 flex-1 gap-2 overflow-hidden mt-2"
+  }, sideBarItems.map((item, index) => {
+    const isActive = location.pathname === item.path;
+    return /*#__PURE__*/React.createElement("li", {
+      key: index,
+      className: !isExpanded ? "tooltip hover:tooltip-open tooltip-right z-50" : "",
+      "data-tip": item.name
+    }, /*#__PURE__*/React.createElement(Link, {
+      to: item.path,
+      className: `
+                        group relative flex items-center gap-4 px-3 py-3 rounded-lg transition-all duration-200
+                        ${!isExpanded ? "justify-center" : ""} 
+                        ${isActive ? "bg-emerald-50 text-emerald-700" : "text-slate-600 hover:bg-slate-50 hover:text-emerald-600"}
+                      `
+    }, isActive && isExpanded && /*#__PURE__*/React.createElement("span", {
+      className: "absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-emerald-600 rounded-r-full"
+    }), /*#__PURE__*/React.createElement("i", {
+      className: `
+                        ${item.icon} text-lg transition-transform group-hover:scale-110
+                        ${isActive ? "text-emerald-600" : "text-slate-400 group-hover:text-emerald-500"}
+                      `
+    }), /*#__PURE__*/React.createElement("span", {
+      className: `whitespace-nowrap transition-all duration-200 flex-1 ${!isExpanded ? "hidden w-0 opacity-0" : "block opacity-100"}`
+    }, item.name)));
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "p-4 border-t border-base-300 bg-base-200"
+  }, isExpanded ?
+  React.createElement("div", {
+    className: "flex flex-col gap-3 animate-fade-in"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center gap-3 p-2 bg-white rounded-xl border border-base-300 shadow-sm"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "avatar placeholder"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "bg-emerald-600 text-neutral-content rounded-full w-10 ring ring-emerald-100 ring-offset-1 flex items-center justify-center"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "text-lg font-bold"
+  }, (user?.name || "U").charAt(0)))), /*#__PURE__*/React.createElement("div", {
+    className: "overflow-hidden"
+  }, /*#__PURE__*/React.createElement("p", {
+    className: "font-bold text-sm text-slate-700 truncate"
+  }, user?.name || "ผู้ใช้งาน"), /*#__PURE__*/React.createElement("p", {
+    className: "text-xs text-slate-500"
+  }, user && user?.role === "ADMIN" ? "Administrator" : "Supervisor"))), /*#__PURE__*/React.createElement("button", {
+    className: "btn btn-outline btn-error btn-sm w-full gap-2",
+    onClick: () => {
+      onLogout?.();
+      setIsSidebarOpen(false);
+    }
+  }, /*#__PURE__*/React.createElement("i", {
+    className: "fa-solid fa-right-from-bracket"
+  }), "ออกจากระบบ")) :
+  React.createElement("div", {
+    className: "flex flex-col items-center gap-4"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "avatar avatart-placeholder"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "bg-emerald-600 text-neutral-content rounded-full w-8 ring ring-emerald-100 flex items-center justify-center"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "text-sm"
+  }, (user?.name || "U").charAt(0)))), /*#__PURE__*/React.createElement("button", {
+    className: "btn btn-error btn-outline",
+    onClick: () => {
+      onLogout?.();
+    }
+  }, /*#__PURE__*/React.createElement("i", {
+    className: "fa-solid fa-right-from-bracket"
+  }))))))));
+};</script>

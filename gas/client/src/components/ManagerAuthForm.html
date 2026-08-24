@@ -1,0 +1,117 @@
+<script type="text/javascript">var {
+  useState
+} = React;
+var {
+  useHistory
+} = ReactRouterDOM;
+var ManagerAuthForm = ({
+  onClose,
+  onLoginSuccess,
+  isLoading,
+  setIsLoading
+}) => {
+  const [formData, setFormData] = useState({
+    username: "",
+    password: ""
+  });
+  const [showPassword, setShowPassword] = useState(false);
+  const history = useHistory();
+  const handleChange = e => {
+    const {
+      name,
+      value
+    } = e.target;
+    setFormData({
+      ...formData,
+      [name]: value
+    });
+  };
+  const handleLoginSubmit = e => {
+    e.preventDefault();
+    setIsLoading(true);
+    google.script.run.withSuccessHandler(res => {
+      if (res.success === true) {
+        onLoginSuccess(res.data);
+        onClose();
+        history.push("/manager-candidate");
+        Swal.fire({
+          icon: "success",
+          title: res.message,
+          timer: 2000
+        });
+      } else {
+        Swal.fire({
+          icon: "error",
+          title: res.message,
+          timer: 2000
+        });
+      }
+      setIsLoading(false);
+    }).withFailureHandler(err => {
+      Swal.fire({
+        icon: "error",
+        title: "เกิดข้อผิดพลาด",
+        text: err.message || "เกิดข้อผิดพลาดในการเข้าสู่ระบบ",
+        timer: 2000
+      });
+      setIsLoading(false);
+    }).loginManager(formData);
+  };
+  return /*#__PURE__*/React.createElement("div", {
+    className: "w-full space-y-5 animate-fade-in"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center gap-2"
+  }, /*#__PURE__*/React.createElement("img", {
+    src: "https://drive.google.com/thumbnail?id=1LxpMS-U8MB14QlofD7t9vlAPQQ7hTna0",
+    alt: "user-logo",
+    className: "size-7 sm:size-8 rounded-full"
+  }), /*#__PURE__*/React.createElement("p", {
+    className: "font-semibold text-amber-700 text-lg sm:text-xl"
+  }, "\u0E2A\u0E33\u0E2B\u0E23\u0E31\u0E1A\u0E1C\u0E39\u0E49\u0E2A\u0E31\u0E21\u0E20\u0E32\u0E29\u0E13\u0E4C")), /*#__PURE__*/React.createElement("form", {
+    onSubmit: handleLoginSubmit,
+    className: "w-full text-sm space-y-3"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex flex-col gap-1"
+  }, /*#__PURE__*/React.createElement("label", {
+    htmlFor: "username",
+    className: "flex gap-2"
+  }, "\u0E0A\u0E37\u0E48\u0E2D\u0E1C\u0E39\u0E49\u0E43\u0E0A\u0E49 (Username)", " ", /*#__PURE__*/React.createElement("span", {
+    className: "text-xs sm:text-sm text-red-500"
+  }, "*")), /*#__PURE__*/React.createElement("input", {
+    type: "text",
+    className: "w-full input focus-within:border-none",
+    id: "username",
+    name: "username",
+    onChange: handleChange,
+    placeholder: "\u0E0A\u0E37\u0E48\u0E2D\u0E1C\u0E39\u0E49\u0E43\u0E0A\u0E49",
+    required: true
+  })), /*#__PURE__*/React.createElement("div", {
+    className: "relative flex flex-col gap-1"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex justify-between items-end"
+  }, /*#__PURE__*/React.createElement("label", {
+    htmlFor: "password",
+    className: "text-sm"
+  }, "\u0E23\u0E2B\u0E31\u0E2A\u0E1C\u0E48\u0E32\u0E19", " ", /*#__PURE__*/React.createElement("span", {
+    className: "text-xs text-red-500 font-normal"
+  }, "*"))), /*#__PURE__*/React.createElement("input", {
+    type: showPassword ? "text" : "password",
+    className: "w-full relative input focus-within:border-none",
+    id: "password",
+    name: "password",
+    onChange: handleChange,
+    placeholder: "\u0E23\u0E2B\u0E31\u0E2A\u0E1C\u0E48\u0E32\u0E19",
+    required: true
+  }), /*#__PURE__*/React.createElement("span", {
+    onClick: () => setShowPassword(!showPassword),
+    className: "absolute top-7 right-3 size-8 rounded-full hover:bg-base-300 cursor-pointer duration-200 active:scale-95 transform transition-all text-gray-600 flex items-center justify-center"
+  }, showPassword ? /*#__PURE__*/React.createElement("i", {
+    className: "fa-solid fa-eye-slash"
+  }) : /*#__PURE__*/React.createElement("i", {
+    className: "fa-solid fa-eye"
+  }))), /*#__PURE__*/React.createElement("button", {
+    type: "submit",
+    disabled: isLoading,
+    className: "w-full bg-amber-600 hover:bg-amber-500 py-2.5 text-white cursor-pointer rounded-box duration-200 mt-1 text-base"
+  }, isLoading ? /*#__PURE__*/React.createElement(Loader, null) : "เข้าสู่ระบบ")));
+};</script>

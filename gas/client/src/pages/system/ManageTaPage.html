@@ -1,0 +1,78 @@
+<script type="text/javascript">var {
+  useState,
+  useEffect
+} = React;
+var ManageTaPage = ({
+  user
+}) => {
+  const [addModalOpen, setIsAddModalOpen] = useState(false);
+  const [editModalOpen, setEditModalOpen] = useState(null);
+  const [taData, setTaData] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const fetchTaData = () => {
+    setIsLoading(true);
+    const normalizeDate = dateStr => {
+      const d = new Date(dateStr);
+      if (d.getFullYear() > 2400) {
+        d.setFullYear(d.getFullYear() - 543);
+      }
+      return d.getTime();
+    };
+    google.script.run.withSuccessHandler(res => {
+      const sortedData = [...res].sort((a, b) => {
+        const timeA = normalizeDate(a.TimeStamp);
+        const timeB = normalizeDate(b.TimeStamp);
+        return timeB - timeA;
+      });
+      setTaData(sortedData);
+      setIsLoading(false);
+    }).withFailureHandler(err => {
+      if (err) {
+        Swal.fire({
+          icon: "error",
+          title: "เกิดข้อผิดพลาด",
+          text: err.message,
+          timer: 2000
+        });
+      }
+      setIsLoading(false);
+    }).getAllTaData(user.role);
+  };
+  useEffect(() => {
+    fetchTaData();
+  }, []);
+  return /*#__PURE__*/React.createElement("div", {
+    className: "w-full max-w-7xl xl:max-w-[1440px] mx-auto pb-24"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex flex-col sm:flex-row items-center justify-center sm:justify-between gap-6 mb-8 animate-fade-in-up"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex flex-col text-center sm:text-start"
+  }, /*#__PURE__*/React.createElement(SystemHeader, {
+    title: "\u0E08\u0E31\u0E14\u0E01\u0E32\u0E23\u0E1C\u0E39\u0E49\u0E43\u0E0A\u0E49\u0E07\u0E32\u0E19",
+    subTitle: "\u0E15\u0E23\u0E27\u0E08\u0E2A\u0E2D\u0E1A\u0E41\u0E25\u0E30\u0E41\u0E01\u0E49\u0E44\u0E02\u0E02\u0E49\u0E2D\u0E21\u0E39\u0E25\u0E1C\u0E39\u0E49\u0E43\u0E0A\u0E49\u0E07\u0E32\u0E19\u0E43\u0E19\u0E23\u0E30\u0E1A\u0E1A"
+  })), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setIsAddModalOpen(true),
+    className: "btn bg-emerald-600 hover:bg-emerald-500 text-white  hover:scale-110 duration-300 transition-all"
+  }, "\u0E40\u0E1E\u0E34\u0E48\u0E21\u0E1C\u0E39\u0E49\u0E43\u0E0A\u0E49\u0E07\u0E32\u0E19")), isLoading ? /*#__PURE__*/React.createElement("div", {
+    className: "w-full flex justify-center animate-fade-in-up"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "loading loading-spinner loading-md"
+  })) : /*#__PURE__*/React.createElement("div", {
+    className: "w-full animate-fade-in"
+  }, /*#__PURE__*/React.createElement(TaTable, {
+    user: user,
+    data: taData,
+    onRefresh: fetchTaData,
+    setOnEdit: setEditModalOpen
+  })), addModalOpen && /*#__PURE__*/React.createElement(AddTaModal, {
+    isOpen: addModalOpen,
+    onRefresh: fetchTaData,
+    onClose: () => setIsAddModalOpen(false)
+  }), editModalOpen && /*#__PURE__*/React.createElement(EditTaModal, {
+    user: user,
+    isOpen: editModalOpen,
+    ta: editModalOpen,
+    onClose: () => setEditModalOpen(null),
+    onRefresh: fetchTaData
+  }));
+};</script>

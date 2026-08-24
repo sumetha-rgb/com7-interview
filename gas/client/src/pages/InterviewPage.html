@@ -1,0 +1,69 @@
+<script type="text/javascript">var {
+  useCallback
+} = React;
+var InterviewPage = ({ user, setSelectedInterview }) => {
+  const { useState, useEffect } = React; // ← เพิ่มบรรทัดนี้
+
+  const [interviews, setInterviews] = useState([]);
+  const [paginationData, setPaginationData] = useState({});
+  const [isLoading, setIsLoading] = useState(false);
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(6);
+
+  const fetchInterviews = useCallback(() => {
+    setIsLoading(true);
+    const query = {
+      candidateId: user.userId,
+      page,
+      limit
+    };
+    google.script.run.withSuccessHandler(res => {
+      if (res.success === true) {
+        setInterviews(res.data);
+        setPaginationData(res.pagination);
+      }
+      setIsLoading(false);
+    }).withFailureHandler(err => {
+      if (err) {
+        Swal.fire({
+          icon: "error",
+          title: "เกิดข้อผิดพลาด",
+          text: err.message,
+          timer: 2000
+        });
+      }
+      setIsLoading(false);
+    }).getAllInterviews(query, user.role);
+  }, [page, limit]);
+  useEffect(() => {
+    fetchInterviews();
+  }, [page, limit]);
+  return /*#__PURE__*/React.createElement("div", {
+    className: "padding-container mt-16 text-sm animate-fade-in-up"
+  }, /*#__PURE__*/React.createElement("header", {
+    className: "flex flex-col justify-center items-center sm:items-start"
+  }, /*#__PURE__*/React.createElement("h1", {
+    className: "font-semibold text-2xl md:text-3xl"
+  }, "\u0E1C\u0E25\u0E01\u0E32\u0E23\u0E25\u0E07\u0E17\u0E30\u0E40\u0E1A\u0E35\u0E22\u0E19\u0E2A\u0E31\u0E21\u0E20\u0E32\u0E29\u0E13\u0E4C"), /*#__PURE__*/React.createElement("p", {
+    className: "text-sm md:text-base text-center sm:text-left text-gray-500/90 mt-2 max-w-156"
+  }, "\u0E14\u0E39\u0E41\u0E25\u0E30\u0E08\u0E31\u0E14\u0E01\u0E32\u0E23\u0E02\u0E49\u0E2D\u0E21\u0E39\u0E25\u0E01\u0E32\u0E23\u0E25\u0E07\u0E17\u0E30\u0E40\u0E1A\u0E35\u0E22\u0E19\u0E2A\u0E31\u0E21\u0E20\u0E32\u0E29\u0E13\u0E4C (\u0E2A\u0E32\u0E21\u0E32\u0E23\u0E16\u0E41\u0E01\u0E49\u0E44\u0E02\u0E02\u0E49\u0E2D\u0E21\u0E39\u0E25\u0E01\u0E48\u0E2D\u0E19\u0E27\u0E31\u0E19\u0E2A\u0E31\u0E21\u0E20\u0E32\u0E29\u0E13\u0E4C 3 \u0E27\u0E31\u0E19\u0E40\u0E17\u0E48\u0E32\u0E19\u0E31\u0E49\u0E19)")), /*#__PURE__*/React.createElement("div", {
+    className: "mt-12"
+  }, isLoading ? /*#__PURE__*/React.createElement("div", {
+    className: "w-full flex justify-center animate-spin"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "loading loading-spinner loading-md"
+  })) : /*#__PURE__*/React.createElement("div", {
+    className: "space-y-6 w-full animate-fade-in-up"
+  }, /*#__PURE__*/React.createElement("p", {
+    className: "text-gray-500 text-sm sm:text-base"
+  }, "\u0E17\u0E31\u0E49\u0E07\u0E2B\u0E21\u0E14: ", interviews ? interviews.length : 0), interviews.length > 0 ? /*#__PURE__*/React.createElement(React.Fragment, null, interviews.map(interview => /*#__PURE__*/React.createElement(InterviewCard, {
+    interview: interview,
+    onClick: () => setSelectedInterview(interview),
+    user: user,
+    key: interview.Interview_Id,
+    interviewId: interview.Interview_Id,
+    onFetching: fetchInterviews
+  }))) : /*#__PURE__*/React.createElement("div", {
+    className: "w-full flex justify-center text-gray-600"
+  }, /*#__PURE__*/React.createElement("p", null, "\u0E44\u0E21\u0E48\u0E1E\u0E1A\u0E01\u0E32\u0E23\u0E25\u0E07\u0E17\u0E30\u0E40\u0E1A\u0E35\u0E22\u0E19\u0E2A\u0E31\u0E21\u0E20\u0E32\u0E13\u0E4C")))));
+};</script>

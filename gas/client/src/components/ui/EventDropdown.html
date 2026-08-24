@@ -1,0 +1,58 @@
+<script type="text/javascript">var {
+  useState,
+  useEffect,
+  useRef
+} = React;
+var EventDropdown = ({
+  events,
+  selected,
+  setSelected
+}) => {
+  const [query, setQuery] = useState("");
+  const [isOpen, setIsOpen] = useState(false);
+  const wrapperRef = useRef(null);
+  const filteredEvent = query === "" ? events : events.filter(event => event.toLowerCase().includes(query.toLowerCase()));
+  const handleSelected = event => {
+    setSelected(event);
+    setQuery(event);
+    setIsOpen(false);
+  };
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (wrapperRef.current && !wrapperRef.current.contains(event.target)) {
+        setIsOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [wrapperRef]);
+  return /*#__PURE__*/React.createElement("div", {
+    ref: wrapperRef,
+    className: "w-full flex flex-col items-center"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "relative w-full"
+  }, /*#__PURE__*/React.createElement("input", {
+    type: "text",
+    className: "relative w-full input input-sm outline-none focus-within:ring-0 text-gray-500",
+    placeholder: "\u0E40\u0E25\u0E37\u0E2D\u0E01\u0E2D\u0E35\u0E40\u0E27\u0E19\u0E15\u0E4C",
+    value: query ? query : selected,
+    onChange: e => setQuery(e.target.value),
+    onClick: () => setIsOpen(!isOpen)
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "absolute right-2 top-1"
+  }, /*#__PURE__*/React.createElement("i", {
+    className: `fa-solid fa-caret-down transform text-xs transition-all duration-200 ${isOpen ? "rotate-180" : ""}`
+  })), isOpen && filteredEvent.length > 0 && /*#__PURE__*/React.createElement("ul", {
+    className: "absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-md bg-white py-1 text-base shadow-lg p-2 ring-opacity-5 focus:outline-none sm:text-sm"
+  }, filteredEvent.map((event, index) => /*#__PURE__*/React.createElement("li", {
+    key: index,
+    onClick: () => handleSelected(event),
+    className: `cursor-pointer select-none px-4 py-2 hover:bg-base-300 text-start duration-75 rounded-lg text-sm sm:text-base mb-2 text-gray-700
+                    ${selected === event ? "bg-base-300 " : ""}    
+                `
+  }, event))), isOpen && query !== "" && filteredEvent.length === 0 && /*#__PURE__*/React.createElement("div", {
+    className: "absolute z-10 mt-1 w-full rounded-md bg-white px-4 py-2 text-sm text-gray-500 shadow-lg border"
+  }, "\u0E44\u0E21\u0E48\u0E1E\u0E1A\u0E2D\u0E35\u0E40\u0E27\u0E19\u0E15\u0E4C")));
+};</script>

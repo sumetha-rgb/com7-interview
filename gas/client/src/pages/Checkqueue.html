@@ -1,0 +1,599 @@
+<script type="text/javascript">
+var { useState, useEffect } = React;
+
+/*
+  CheckQueuePage — ตรวจสอบลำดับคิว
+  ─────────────────────────────────────────────────────────────────
+  แสดง Event ทั้งหมดในระบบ:
+    • ลงทะเบียนแล้ว  → badge สีเขียว "เข้าร่วม"
+    • ยังไม่ได้ลงทะเบียน → badge สีเทา "ไม่ได้เข้าร่วม"
+  คลิก Event:
+    • ไม่ได้ลงทะเบียน  → ปิด popup (ไม่เปิด)
+    • ลงทะเบียนแล้ว + ยังไม่เช็คชื่อ → แสดง "คุณยังไม่ได้เช็คชื่อ"
+    • ลงทะเบียนแล้ว + เช็คชื่อแล้ว  → แสดงบัตรคิว (โลโก้+เลขคิว, ชื่อ, วันที่, ประเภทงาน)
+  ─────────────────────────────────────────────────────────────────
+*/
+
+var CheckQueuePage = ({ user }) => {
+  const [allEvents, setAllEvents]           = useState([]);   // Event ทั้งหมด
+  const [registeredMap, setRegisteredMap]   = useState({});   // { Event_Name/ID: registrationObj }
+  const [search, setSearch]                 = useState("");
+  const [isLoading, setIsLoading]           = useState(false);
+  const [modal, setModal]                   = useState(null); // null | { type, event, reg }
+
+  /* ── 1. ดึง Event ทั้งหมด ── */
+  const fetchAllEvents = () => {
+    setIsLoading(true);
+    google.script.run
+      .withSuccessHandler(res => {
+        if (res && res.success) setAllEvents(res.data || []);
+        setIsLoading(false);
+      })
+      .withFailureHandler(err => {
+        if (err) Swal.fire({ icon: "error", title: "เกิดข้อผิดพลาด", text: err.message, timer: 2000 });
+        setIsLoading(false);
+      })
+      .getAllEventsForQueue();   // ← backend ส่ง event ทั้งหมด
+  };
+
+  /* ── 2. ดึง Event ที่ user ลงทะเบียนไว้ ── */
+  const fetchMyRegistrations = () => {
+    const candidateId = user ? (user.userId || user.id) : null;
+    if (!candidateId) return;
+
+    google.script.run
+      .withSuccessHandler(res => {
+        if (res && res.success) {
+          console.log("DEBUG getQueueCandidates raw response:", res.data);
+          const map = {};
+          (res.data || []).forEach(iv => {
+            const sheetId = (iv.eventDetail && iv.eventDetail.Sheet_ID) || "";
+            const eventNameOfInterview = (iv.eventDetail && iv.eventDetail.Event_Name) || "";
+            const reg = {
+              ...iv,
+              Event_Sheet_ID: sheetId,
+              Event_Name: eventNameOfInterview,
+              Date: iv.Interview_Date || (iv.slotDetail && iv.slotDetail.Date) || "",
+              // queueNo ถูกแนบมาจาก getQueueCandidates แล้ว (iv.queueNo)
+            };
+            const key = sheetId || eventNameOfInterview;
+            if (key) map[key] = reg;
+          });
+          setRegisteredMap(map);
+        }
+      })
+      .withFailureHandler(() => {})
+      .getQueueCandidates({ candidateId, limit: 999999 }, "USER");
+  };
+
+  useEffect(() => {
+    fetchAllEvents();
+    fetchMyRegistrations();
+  }, []);
+
+  const parseThaiDate = (dateStr) => {
+  if (!dateStr) return null;
+  const value = String(dateStr).trim();
+
+  const isoDateOnly = value.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (isoDateOnly) {
+    let year = Number(isoDateOnly[1]);
+    if (year > 2400) year -= 543;
+    return new Date(year, Number(isoDateOnly[2]) - 1, Number(isoDateOnly[3]));
+  }
+
+  const thaiMatch = value.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if (thaiMatch) {
+    let year = Number(thaiMatch[3]);
+    if (year > 2400) year -= 543;
+    return new Date(year, Number(thaiMatch[2]) - 1, Number(thaiMatch[1]));
+  }
+
+  const parsed = new Date(value);
+  if (!isNaN(parsed.getTime())) return parsed;
+
+  return null;
+};
+
+  const isEventPast = (event) => {
+    const eventDate = parseThaiDate(event.Date);
+    if (!eventDate) return false;
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const eventDayStart = new Date(eventDate.getFullYear(), eventDate.getMonth(), eventDate.getDate());
+    return eventDayStart.getTime() < todayStart.getTime();
+  };
+
+  const getRegistration = (event) => {
+    return (
+      registeredMap[event.Sheet_ID] ||
+      registeredMap[event.Event_Name] ||
+      null
+    );
+  };
+
+  const filtered = allEvents
+    .filter(ev => !isEventPast(ev))
+    .filter(ev => !!getRegistration(ev))
+    .filter(ev =>
+      !search || (ev.Event_Name || "").toLowerCase().includes(search.toLowerCase())
+    );
+
+  const getQueueDisplayNo = (reg) => {
+    const candidates = [
+      reg?.Queue_No,
+      reg?.queueNo,
+      reg?.queue_no,
+      reg?.No,
+      reg?.Queue_Number,
+      reg?.queueNumber,
+    ];
+
+    const found = candidates.find((value) => {
+      if (value === undefined || value === null) return false;
+      return String(value).trim() !== "";
+    });
+
+    return found === undefined ? "-" : String(found);
+  };
+
+  const formatThaiFullDate = (dateStr) => {
+    const date = parseThaiDate(dateStr);
+    if (!date) return "-";
+    return new Intl.DateTimeFormat("th-TH", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+      timeZone: "Asia/Bangkok",
+    }).format(date);
+  };
+
+  const extractTimeFromDateField = (dateStr) => {
+  if (!dateStr) return "";
+  const match = String(dateStr).match(/(\d{1,2}:\d{2}\s*-\s*\d{1,2}:\d{2})/);
+  return match ? match[1] : "";
+};
+
+  const formatThaiTimeRange = (period) => {
+    if (!period) return "-";
+    const normalized = String(period)
+      .trim()
+      .replace(/[–—]/g, "-")
+      .replace(/\s*-\s*/, " - ")
+      .replace(/:/g, ".");
+    return normalized ? `เวลา ${normalized}` : "-";
+  };
+
+  const handleCardClick = (event) => {
+    const reg = getRegistration(event);
+    if (!reg) return;
+
+    const status = String(reg.Participation_Status || "").trim();
+    const isCheckedIn = status === "เข้าร่วม" || status === "Walk-In";
+
+    if (!isCheckedIn) {
+      setModal({ type: "not_checked", event, reg });
+    } else {
+      setModal({ type: "queue_card", event, reg });
+    }
+  };
+
+  /* ── Render Modal ── */
+  const renderModal = () => {
+    if (!modal) return null;
+    const { type, event, reg } = modal;
+
+    const overlay = {
+      position: "fixed", inset: 0,
+      background: "rgba(0,0,0,0.45)",
+      zIndex: 9999,
+      display: "flex", alignItems: "center", justifyContent: "center",
+      padding: "16px"
+    };
+
+    const card = {
+      background: "#fff",
+      borderRadius: "20px",
+      width: "100%", maxWidth: "400px",
+      padding: "32px 28px",
+      boxShadow: "0 20px 60px rgba(0,0,0,0.2)",
+      position: "relative",
+      textAlign: "center",
+      fontFamily: "'Prompt', 'Sarabun', sans-serif"
+    };
+
+    const closeBtn = React.createElement("button", {
+      onClick: () => setModal(null),
+      style: {
+        position: "absolute", top: "14px", right: "16px",
+        background: "none", border: "none", fontSize: "20px",
+        cursor: "pointer", color: "#9ca3af", lineHeight: 1
+      }
+    }, "✕");
+
+    if (type === "not_checked") {
+      return React.createElement("div", {
+        style: overlay,
+        onClick: (e) => { if (e.target === e.currentTarget) setModal(null); }
+      },
+        React.createElement("div", { style: card },
+          closeBtn,
+          React.createElement("div", { style: { fontSize: "52px", marginBottom: "12px" } }, "⏳"),
+          React.createElement("h2", {
+            style: { fontSize: "22px", fontWeight: 700, color: "#1f2937", marginBottom: "8px" }
+          }, event.Event_Name),
+          React.createElement("div", {
+            style: {
+              margin: "16px 0",
+              padding: "16px",
+              background: "#fef9c3",
+              borderRadius: "12px",
+              border: "1px solid #fde047"
+            }
+          },
+            React.createElement("p", {
+              style: { fontSize: "18px", fontWeight: 600, color: "#92400e", margin: 0 }
+            }, "คุณยังไม่ได้เช็คชื่อ"),
+            React.createElement("p", {
+              style: { fontSize: "13px", color: "#a16207", marginTop: "6px" }
+            }, "กรุณาติดต่อเจ้าหน้าที่เพื่อเช็คชื่อก่อนเข้าสัมภาษณ์")
+          ),
+          React.createElement("p", {
+            style: { fontSize: "13px", color: "#6b7280", marginTop: "8px" }
+          },
+            React.createElement("i", { className: "fa-regular fa-calendar", style: { marginRight: "6px" } }),
+            event.Date
+              ? `${formatThaiFullDate(event.Date)} ${formatThaiTimeRange(extractTimeFromDateField(event.Date))}`
+              : (reg.Date ? formatThaiFullDate(reg.Date) : "-")
+          )
+        )
+      );
+    }
+
+    /* ── บัตรคิว ── */
+    
+    const queueNo = getQueueDisplayNo(reg);
+    const fullname = reg.Fullname || reg.Name || user?.name || "-";
+    const dateStr = reg.Date || event.Date;
+    const formattedDate = dateStr
+      ? formatThaiFullDate(dateStr)
+      : "-";
+    const period = reg.Interview_Period || event.Interview_Period || "";
+    const formattedPeriod = formatThaiTimeRange(period);
+    const positionApplied = reg.Position_Applied || reg.Applied_Position || reg["ตำแหน่งที่สมัคร"] || reg.Position || reg.Employee_Category || reg.Position_Type || reg.event_job_type || reg.employeeCategory || reg.Employee_Type || reg.EmployeeType || "-";
+
+    return React.createElement("div", {
+      style: overlay,
+      onClick: (e) => { if (e.target === e.currentTarget) setModal(null); }
+    },
+      React.createElement("div", { style: card },
+        closeBtn,
+
+        /* 1. กล่องโลโก้ + หมายเลขคิว (สีขาวตามดีไซน์ใหม่) */
+        React.createElement("div", {
+          style: {
+            background: "#ffffff",
+            borderRadius: "16px",
+            border: "1px solid #e5e7eb",
+            display: "grid",
+            gridTemplateColumns: "1fr 1fr",
+            overflow: "hidden",
+            marginBottom: "20px",
+            boxShadow: "0 4px 14px rgba(0,0,0,0.06)",
+            alignItems: "stretch",
+            minHeight: "110px"
+          }
+        },
+          /* ฝั่งซ้าย: โลโก้พอดีกรอบ ไม่ยืดเสียสัดส่วน */
+          React.createElement("div", {
+            style: {
+              background: "#ffffff",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: "20px 24px",
+              borderRight: "1px dashed #e5e7eb"
+            }
+          },
+            React.createElement("img", {
+              src: "https://www.comseven.com/wp-content/uploads/2024/07/logo-com7-004.png",
+              alt: "COM7",
+              style: {
+                width: "100%",
+                height: "auto",
+                maxHeight: "70px",
+                objectFit: "contain"
+              }
+            })
+          ),
+          /* ฝั่งขวา: ตัวเลข + ลำดับคิว สีดำพื้นขาว */
+          React.createElement("div", {
+            style: {
+              background: "#ffffff",
+              display: "flex",
+              flexDirection: "column",
+              justifyContent: "center",
+              alignItems: "center",
+              padding: "14px 16px"
+            }
+          },
+            React.createElement("span", {
+              style: {
+                fontSize: "58px",
+                fontWeight: 800,
+                lineHeight: 1,
+                color: "#111827",
+                fontFamily: "'Prompt', 'Sarabun', -apple-system, sans-serif",
+                fontVariantNumeric: "tabular-nums"
+              }
+            }, queueNo),
+            React.createElement("p", {
+              style: {
+                fontSize: "12px",
+                fontWeight: 600,
+                color: "#111827",
+                marginTop: "4px",
+                letterSpacing: "0.02em",
+                margin: 0
+              }
+            }, "ลำดับคิว")
+          )
+        ),
+
+        /* 2. กล่องชื่อ-นามสกุล (ปรับปรุงให้รองรับมือถือ ไม่ตกบรรทัด สระไม่แหว่ง) */
+        React.createElement("div", {
+          style: {
+            background: "#ffffff",
+            borderRadius: "12px",
+            padding: "14px 12px", // ปรับลด padding ซ้าย-ขวา เพื่อเพิ่มพื้นที่แนวราบในจอมือถือ
+            marginBottom: "14px",
+            border: "1px solid #e5e7eb",
+            textAlign: "center"
+          }
+        },
+          React.createElement("p", { style: { fontSize: "12px", color: "#6b7280", marginBottom: "4px" } }, "ชื่อ-นามสกุล"),
+          React.createElement("p", { 
+            style: { 
+              fontSize: "16px",        // ปรับขนาดลงมาเล็กน้อยให้สมดุลกับจอมือถือ
+              fontWeight: 700, 
+              color: "#111827",
+              lineHeight: "1.5",       // เพิ่มความสูงบรรทัดป้องกันสระอุ/สระอูแหว่ง
+              whiteSpace: "nowrap",    // ล็อคคำสั่งห้ามตัดคำขึ้นบรรทัดใหม่เด็ดขาด
+              letterSpacing: "-0.02em" // บีบช่องว่างระหว่างตัวอักษรให้ประหยัดพื้นที่ขึ้น
+            } 
+          }, fullname)
+        ),
+
+        /* 3. กล่องวันที่ & ช่วงเวลา (ปรับปรุงแก้ปัญหาข้อความเบียดตัดกันในจอมือถือ) */
+        React.createElement("div", {
+          style: {
+            display: "grid",
+            gridTemplateColumns: "1fr 1fr",
+            gap: "8px", // ปรับลดขนาดลงเล็กน้อย เพิ่มพื้นที่ให้กล่องซ้าย-ขวา
+            marginBottom: "14px"
+          }
+        },
+          React.createElement("div", {
+            style: {
+              background: "#ffffff", borderRadius: "12px",
+              padding: "10px 6px", // ปรับลด padding ข้างเพื่อคืนพื้นที่ให้ข้อความวันที่
+              border: "1px solid #e5e7eb", textAlign: "center"
+            }
+          },
+            React.createElement("p", { style: { fontSize: "11px", color: "#6b7280", marginBottom: "4px" } }, "วันที่"),
+            React.createElement("p", { 
+              style: { 
+                fontSize: "13px",        // ปรับขนาดลงให้เรียงแถวเดียวพอดีบนหน้าจอมือถือ
+                fontWeight: 700, 
+                color: "#374151",
+                lineHeight: "1.4",
+                whiteSpace: "nowrap",    // ล็อคไว้ให้อยู่บรรทัดเดียว
+                letterSpacing: "-0.03em" // บีบช่องว่างฟอนต์ภาษาไทยเล็กน้อยเพื่อประหยัดพื้นที่ด้านข้าง
+              } 
+            }, formattedDate)
+          ),
+          period && React.createElement("div", {
+            style: {
+              background: "#ffffff", borderRadius: "12px",
+              padding: "10px 6px", // ปรับลด padding ข้างเพื่อคืนพื้นที่ให้ข้อความช่วงเวลา
+              border: "1px solid #e5e7eb", textAlign: "center"
+            }
+          },
+            React.createElement("p", { style: { fontSize: "11px", color: "#6b7280", marginBottom: "4px" } }, "ช่วงเวลา"),
+            React.createElement("p", { 
+              style: { 
+                fontSize: "13px",        // ปรับขนาดลงให้เรียงแถวเดียวพอดีบนหน้าจอมือถือ
+                fontWeight: 700, 
+                color: "#374151",
+                lineHeight: "1.4",
+                whiteSpace: "nowrap",    // ล็อคไว้ให้อยู่บรรทัดเดียว
+                letterSpacing: "-0.03em" // บีบช่องว่างฟอนต์ภาษาไทยเล็กน้อยเพื่อประหยัดพื้นที่ด้านข้าง
+              } 
+            }, formattedPeriod)
+          )
+        ),
+
+        /* 4. กล่องตำแหน่งที่สมัคร (ปรับจากพื้นเขียวเป็นพื้นขาว ขอบเทา) */
+        React.createElement("div", {
+          style: {
+            background: "#ffffff", borderRadius: "12px",
+            padding: "12px 14px", border: "1px solid #e5e7eb", textAlign: "center"
+          }
+        },
+          React.createElement("p", { style: { fontSize: "12px", color: "#6b7280", marginBottom: "4px" } }, "ตำแหน่งที่สมัคร"),
+          React.createElement("p", { style: { fontSize: "16px", fontWeight: 700, color: "#374151" } }, positionApplied)
+        )
+      )
+    );
+  };
+
+  /* ── Render ── */
+  return React.createElement("div", { className: "w-full flex flex-col" },
+
+    /* Hero */
+    React.createElement("div", { className: "flex flex-col items-center py-20 bg-base-200 padding-container gap-4 sm:gap-8" },
+      React.createElement(Header, {
+        title: "ตรวจสอบลำดับคิว",
+        subTitle: "อีเวนต์ที่คุณเข้าร่วม"
+      }),
+      React.createElement("label", {
+        className: "w-full max-w-140 input input-md rounded-full outline-none border-none h-12 px-6 shadow-sm flex items-center gap-3"
+      },
+        React.createElement("i", { className: "fa-solid fa-magnifying-glass text-sm text-gray-400" }),
+        React.createElement("input", {
+          type: "text",
+          value: search,
+          onChange: e => setSearch(e.target.value),
+          className: "input input-md border-none outline-none focus-within:ring-0 bg-transparent text-gray-600 flex-1",
+          placeholder: "ค้นหาอีเวนต์..."
+        })
+      )
+    ),
+
+    /* Grid */
+    React.createElement("div", { className: "padding-container pt-10 pb-24" },
+      isLoading
+        ? React.createElement("div", { className: "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-fade-in-up" },
+            [...Array(6)].map((_, i) => React.createElement("div", { key: i, className: "flex flex-col gap-4 w-full animate-pulse" },
+              React.createElement("div", { className: "skeleton h-48 w-full rounded-xl" }),
+              React.createElement("div", { className: "skeleton h-4 w-28" }),
+              React.createElement("div", { className: "skeleton h-4 w-full" })
+            ))
+          )
+        : filtered.length === 0
+          ? React.createElement("div", { className: "text-center py-20 text-gray-500 text-lg" }, "คุณยังไม่ได้ลงทะเบียนเข้าร่วมอีเวนต์ใด ๆ")
+          : React.createElement("div", { className: "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-fade-in-up" },
+              filtered.map(event => {
+                const reg = getRegistration(event);
+                const isRegistered = !!reg;
+                const status = reg ? String(reg.Participation_Status || "").trim() : "";
+                const isCheckedIn = status === "เข้าร่วม" || status === "Walk-In";
+                const queueNoPreview = isRegistered ? getQueueDisplayNo(reg) : null;
+
+                return React.createElement("div", {
+                  key: event.Sheet_ID || event.Event_Name,
+                  onClick: () => handleCardClick(event),
+                  className: [
+                    "relative rounded-3xl border transition-all duration-200 overflow-hidden",
+                    isRegistered
+                      ? "cursor-pointer hover:shadow-xl hover:-translate-y-1"
+                      : "cursor-default opacity-70",
+                    isRegistered && isCheckedIn
+                      ? "border-emerald-200 bg-emerald-50"
+                      : isRegistered
+                        ? "border-amber-200 bg-amber-50"
+                        : "border-gray-200 bg-gray-50"
+                  ].join(" ")
+                },
+
+                  /* Image */
+                  event.Image_Url && React.createElement("div", {
+                    style: { height: "140px", overflow: "hidden" }
+                  },
+                    React.createElement("img", {
+                      src: event.Image_Url,
+                      alt: event.Event_Name,
+                      style: { width: "100%", height: "100%", objectFit: "cover" }
+                    })
+                  ),
+
+                  /* Badge ซ้ายบน */
+                  React.createElement("div", {
+                    style: {
+                      position: "absolute",
+                      top: "12px", left: "12px",
+                      background: isRegistered && isCheckedIn
+                        ? "#059669"
+                        : isRegistered
+                          ? "#d97706"
+                          : "#6b7280",
+                      color: "#fff",
+                      fontSize: "11px", fontWeight: 700,
+                      padding: "3px 10px",
+                      borderRadius: "999px",
+                      boxShadow: "0 2px 6px rgba(0,0,0,0.15)"
+                    }
+                  },
+                    isRegistered && isCheckedIn
+                      ? "✓ เข้าร่วม"
+                      : isRegistered
+                        ? "⏳ ยังไม่เช็คชื่อ"
+                        : "ไม่ได้เข้าร่วม"
+                  ),
+
+                  /* คิวมุมขวาบน (ถ้าเช็คชื่อแล้ว) */
+                  isRegistered && isCheckedIn && queueNoPreview && React.createElement("div", {
+                    style: {
+                      position: "absolute",
+                      top: "10px", right: "12px",
+                      background: "rgba(255,255,255,0.95)",
+                      color: "#059669",
+                      fontSize: "13px", fontWeight: 800,
+                      padding: "3px 12px",
+                      borderRadius: "999px",
+                      boxShadow: "0 2px 6px rgba(0,0,0,0.15)"
+                    }
+                  }, `คิว ${queueNoPreview}`),
+
+                  /* Content */
+                  React.createElement("div", { className: "p-5" },
+                    React.createElement("h3", {
+                      style: { fontSize: "17px", fontWeight: 700, color: "#111827", marginBottom: "10px" }
+                    }, event.Event_Name),
+
+                    React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: "6px" } },
+                      event.Date && React.createElement("p", {
+                        style: { fontSize: "13px", color: "#4b5563", display: "flex", alignItems: "center" }
+                      },
+                        React.createElement("i", { className: "fa-regular fa-calendar", style: { marginRight: "8px", color: "#059669", width: "14px" } }),
+                        `${formatThaiFullDate(event.Date)} ${formatThaiTimeRange(extractTimeFromDateField(event.Date))}`
+                      ),
+
+                      event.Location && React.createElement("p", {
+                        style: { fontSize: "13px", color: "#4b5563", display: "flex", alignItems: "center" }
+                      },
+                        React.createElement("i", { className: "fa-solid fa-location-dot", style: { marginRight: "8px", color: "#ef4444", width: "14px" } }),
+                        event.Location
+                      ),
+
+                      isRegistered && React.createElement("p", {
+                        style: { fontSize: "13px", color: "#4b5563", display: "flex", alignItems: "center" }
+                      },
+                        React.createElement("i", { className: `fa-solid ${isCheckedIn ? "fa-circle-check" : "fa-hourglass-half"}`, style: { marginRight: "8px", color: isCheckedIn ? "#059669" : "#d97706", width: "14px" } }),
+                        isCheckedIn ? `เช็คชื่อแล้ว • คิว ${queueNoPreview}` : "รอเช็คชื่อ"
+                      )
+                    ),
+
+                    /* Divider + คำใบ้ */
+                    isRegistered && React.createElement("div", {
+                      style: {
+                        marginTop: "12px",
+                        paddingTop: "10px",
+                        borderTop: "1px dashed " + (isCheckedIn ? "#a7f3d0" : "#fde68a"),
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between"
+                      }
+                    },
+                      React.createElement("span", {
+                        style: {
+                          fontSize: "15px", fontWeight: 700,
+                          color: isCheckedIn ? "#059669" : "#b45309"
+                        }
+                      }, isCheckedIn ? "คลิกเพื่อดูบัตรคิว" : "คลิกเพื่อดูสถานะ"),
+                      React.createElement("i", {
+                        className: "fa-solid fa-arrow-right",
+                        style: { fontSize: "15px", fontWeight: 700, color: isCheckedIn ? "#059669" : "#b45309" }
+                      })
+                    )
+                  )
+                );
+              })
+            )
+    ),
+
+    /* Modal */
+    renderModal()
+  );
+};
+</script>

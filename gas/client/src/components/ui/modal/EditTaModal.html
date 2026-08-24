@@ -1,0 +1,110 @@
+<script type="text/javascript">var {
+  useState,
+  useEffect
+} = React;
+var EditTaModal = ({
+  user,
+  isOpen,
+  onClose,
+  onRefresh,
+  ta
+}) => {
+  const [formData, setFormData] = useState({
+    userRole: user.role,
+    userName: user.name,
+    taUserName: ta.Username,
+    fullname: ta.Name,
+    role: ta.Role
+  });
+  const [isLoading, setIsLoading] = useState(false);
+  const handleChange = e => {
+    const {
+      name,
+      value
+    } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+  const handleSubmit = e => {
+    e.preventDefault();
+    setIsLoading(true);
+    google.script.run.withSuccessHandler(res => {
+      if (res.success === true) {
+        onClose();
+        onRefresh();
+        Swal.fire({
+          icon: "success",
+          title: res.message,
+          showConfirmButton: false,
+          timer: 1500
+        });
+      } else {
+        Swal.fire({
+          icon: "error",
+          title: res.message,
+          timer: 2000
+        });
+      }
+      onClose();
+      setIsLoading(false);
+    }).withFailureHandler(err => {
+      if (err) {
+        Swal.fire({
+          icon: "error",
+          title: "เกิดข้อผิดพลาด",
+          text: err.message,
+          timer: 2000
+        });
+      }
+      setIsLoading(false);
+    }).updateTaData(formData);
+  };
+  return /*#__PURE__*/React.createElement("div", {
+    className: "fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "absolute inset-0 bg-black/60 transition-opacity",
+    onClick: onClose
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "bg-white w-full max-w-md mx-auto rounded-lg shadow-lg z-50 overflow-y-auto animate-fade-in-up"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex justify-between items-center p-4 border-b border-gray-200 rounded-t-lg"
+  }, /*#__PURE__*/React.createElement("h2", {
+    className: "text-lg font-medium"
+  }, "\u0E41\u0E01\u0E49\u0E44\u0E02\u0E1C\u0E39\u0E49\u0E43\u0E0A\u0E49\u0E07\u0E32\u0E19"), /*#__PURE__*/React.createElement("button", {
+    onClick: onClose,
+    className: "btn btn-circle btn-ghost group"
+  }, /*#__PURE__*/React.createElement("i", {
+    className: "fa-solid fa-xmark text-gray-500 group-hover:text-gray-700 duration-200"
+  }))), /*#__PURE__*/React.createElement("form", {
+    onSubmit: handleSubmit,
+    className: "w-full text-sm space-y-3 p-4"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex flex-col gap-1"
+  }, /*#__PURE__*/React.createElement("label", {
+    htmlFor: "fullname",
+    className: "flex gap-2 text-gray-500"
+  }, "\u0E0A\u0E37\u0E48\u0E2D-\u0E2A\u0E01\u0E38\u0E25 ", /*#__PURE__*/React.createElement("span", {
+    className: "text-red-500"
+  }, "*")), /*#__PURE__*/React.createElement("input", {
+    type: "text",
+    className: "w-full input focus-within:border-none",
+    id: "fullname",
+    name: "fullname",
+    value: formData.fullname,
+    onChange: handleChange,
+    placeholder: "\u0E0A\u0E37\u0E48\u0E2D-\u0E2A\u0E01\u0E38\u0E25",
+    required: true
+  })), /*#__PURE__*/React.createElement(SelectField, {
+    label: "\u0E2A\u0E34\u0E17\u0E18\u0E34\u0E4C\u0E01\u0E32\u0E23\u0E43\u0E0A\u0E49\u0E07\u0E32\u0E19",
+    name: "role",
+    value: formData.role,
+    onChange: handleChange,
+    options: ["ADMIN", "SUPERADMIN"]
+  }), /*#__PURE__*/React.createElement("button", {
+    className: "w-full bg-emerald-600 hover:bg-emerald-500 py-2.5 text-white cursor-pointer rounded-box duration-200 mt-1 text-base"
+  }, isLoading ? /*#__PURE__*/React.createElement("span", {
+    className: "loading loading-spinner loading-md"
+  }) : "ยืนยันการแก้ไข"))));
+};</script>

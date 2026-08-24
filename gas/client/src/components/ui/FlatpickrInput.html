@@ -1,0 +1,51 @@
+<script type="text/javascript">var FlatpickrInput = ({
+  key,
+  label,
+  value,
+  onChange,
+  options,
+  icon,
+  placeholder,
+  disabled = false,
+  required = false
+}) => {
+  const inputRef = useRef(null);
+  const fpRef = useRef(null);
+  useEffect(() => {
+    if (inputRef.current) {
+      fpRef.current = flatpickr(inputRef.current, {
+        ...options,
+        defaultDate: value,
+        onChange: (selectedDates, dateStr) => {
+          onChange(dateStr);
+        }
+      });
+    }
+    return () => {
+      if (fpRef.current) fpRef.current.destroy();
+    };
+  }, []);
+  useEffect(() => {
+    if (fpRef.current && value) {
+      fpRef.current.setDate(value, false);
+    }
+  }, [value]);
+  return /*#__PURE__*/React.createElement("div", {
+    className: "form-control w-full"
+  }, /*#__PURE__*/React.createElement("label", {
+    className: "text-gray-500 tex-sm"
+  }, label), /*#__PURE__*/React.createElement("div", {
+    className: "relative"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "absolute inset-y-0 left-0 flex items-center pointer-events-none text-gray-400"
+  }, icon), /*#__PURE__*/React.createElement("input", {
+    ref: inputRef,
+    type: "text",
+    placeholder: placeholder,
+    className: "input input-bordered w-full",
+    value: value,
+    "data-input": true,
+    disabled: disabled,
+    required: required
+  })));
+};</script>

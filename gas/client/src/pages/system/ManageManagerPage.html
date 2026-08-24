@@ -1,0 +1,148 @@
+<script type="text/javascript">var {
+  useState,
+  useEffect
+} = React;
+var ManageManagerPage = ({
+  user
+}) => {
+  const [addModalOpen, setIsAddModalOpen] = useState(false);
+  const [editModalOpen, setEditModalOpen] = useState(null);
+  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const limit = 15;
+  const [managerData, setManagerData] = useState([]);
+  const [paginationData, setPaginationData] = useState({});
+  const [eventDropdown, setEventDropdown] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const fetchManagerData = ({
+    search,
+    page
+  }) => {
+    setIsLoading(true);
+    const query = {
+      search,
+      page,
+      limit
+    };
+    google.script.run.withSuccessHandler(res => {
+      if (res.success === true) {
+        setManagerData(res.data);
+        setPaginationData(res.pagination);
+      }
+      setIsLoading(false);
+    }).withFailureHandler(err => {
+      if (err) {
+        Swal.fire({
+          icon: "error",
+          title: "เกิดข้อผิดพลาด",
+          text: err.message,
+          timer: 2000
+        });
+      }
+      setIsLoading(false);
+    }).getAllManagerData(query, user.role);
+  };
+  const fetchEventDropDown = () => {
+    google.script.run.withSuccessHandler(res => {
+      if (res.success === true) {
+        setEventDropdown(res.data);
+      }
+    }).withFailureHandler(err => {
+      if (err) {
+        Swal.fire({
+          icon: "error",
+          title: "เกิดข้อผิดพลาด",
+          text: err.message,
+          timer: 2000
+        });
+      }
+    }).getEventsData({}, user.role);
+  };
+  const handleSubmit = e => {
+    e.preventDefault();
+    fetchManagerData({
+      search: search,
+      page: page
+    });
+  };
+  const handleReset = () => {
+    setSearch("");
+    setPage(1);
+    fetchManagerData({
+      search: "",
+      page: 1
+    });
+  };
+  useEffect(() => {
+    fetchManagerData({
+      search: search,
+      page: page
+    });
+  }, [page]);
+  useEffect(() => {
+    fetchEventDropDown();
+  }, []);
+  return /*#__PURE__*/React.createElement("div", {
+    className: "w-full max-w-7xl xl:max-w-[1440px] mx-auto pb-24"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex flex-col sm:flex-row items-center justify-center sm:justify-between gap-6 mb-8 animate-fade-in-up"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex flex-col text-center sm:text-start"
+  }, /*#__PURE__*/React.createElement(SystemHeader, {
+    title: "\u0E08\u0E31\u0E14\u0E01\u0E32\u0E23\u0E1C\u0E39\u0E49\u0E2A\u0E31\u0E21\u0E20\u0E32\u0E29\u0E13\u0E4C",
+    subTitle: "\u0E15\u0E23\u0E27\u0E08\u0E2A\u0E2D\u0E1A\u0E41\u0E25\u0E30\u0E41\u0E01\u0E49\u0E44\u0E02\u0E02\u0E49\u0E2D\u0E21\u0E39\u0E25\u0E1C\u0E39\u0E49\u0E2A\u0E31\u0E21\u0E20\u0E32\u0E29\u0E13\u0E4C\u0E43\u0E19\u0E23\u0E30\u0E1A\u0E1A"
+  })), /*#__PURE__*/React.createElement("form", {
+    onSubmit: handleSubmit,
+    className: "w-full max-w-md flex items-center gap-4"
+  }, /*#__PURE__*/React.createElement(InputField, {
+    name: "search",
+    type: "text",
+    value: search,
+    onChange: e => setSearch(e.target.value),
+    placeholder: "\uD83D\uDD0D \u0E04\u0E49\u0E19\u0E2B\u0E32\u0E0A\u0E37\u0E48\u0E2D\u0E1C\u0E39\u0E49\u0E2A\u0E31\u0E21\u0E20\u0E32\u0E29\u0E13\u0E4C...",
+    className: "w-full"
+  }), /*#__PURE__*/React.createElement("button", {
+    type: "submit",
+    className: "hidden"
+  }), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: handleReset,
+    className: "btn btn-ghost text-gray-500 hover:bg-slate-100 border-slate-200",
+    disabled: isLoading,
+    title: "\u0E23\u0E35\u0E40\u0E0B\u0E47\u0E17\u0E04\u0E49\u0E19\u0E2B\u0E32"
+  }, "\u0E23\u0E35\u0E40\u0E0B\u0E47\u0E17"), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: () => setIsAddModalOpen(true),
+    className: "btn bg-emerald-600 hover:bg-emerald-500 text-white  hover:scale-110 duration-300 transition-all"
+  }, "\u0E40\u0E1E\u0E34\u0E48\u0E21\u0E1C\u0E39\u0E49\u0E2A\u0E31\u0E21\u0E20\u0E32\u0E29\u0E13\u0E4C"))), isLoading ? /*#__PURE__*/React.createElement("div", {
+    className: "w-full flex justify-center animate-fade-in-up"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "loading loading-spinner loading-md"
+  })) : /*#__PURE__*/React.createElement("div", {
+    className: "w-full animate-fade-in"
+  }, /*#__PURE__*/React.createElement(ManagerTable, {
+    user: user,
+    data: managerData,
+    onClickEdit: setEditModalOpen,
+    onReset: handleReset
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "mt-6 flex justify-center"
+  }, /*#__PURE__*/React.createElement(PagePagination, {
+    currentPage: paginationData.currentPage || 1,
+    totalPages: paginationData.totalPages || 1,
+    onPageChange: p => {
+      setPage(p);
+      window.scrollTo(0, 0);
+    }
+  }))), addModalOpen && /*#__PURE__*/React.createElement(AddManagerModal, {
+    isOpen: addModalOpen,
+    onRefresh: handleReset,
+    onClose: () => setIsAddModalOpen(false)
+  }), editModalOpen && /*#__PURE__*/React.createElement(EditManagerModal, {
+    isOpen: editModalOpen,
+    managerData: editModalOpen,
+    eventDropdown: eventDropdown,
+    onClose: () => setEditModalOpen(null),
+    onRefresh: handleReset
+  }));
+};</script>

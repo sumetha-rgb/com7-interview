@@ -1,0 +1,241 @@
+<script type="text/javascript">var {
+  useState,
+  useEffect
+} = React;
+var {
+  HashRouter,
+  Switch,
+  Route,
+  Redirect,
+  useHistory,
+  useParams
+} = ReactRouterDOM;
+var App = () => {
+  const [user, setUser] = useState(null);
+  const [isAuthModalOpen, setAuthModalOpen] = useState(false);
+  const [selectedInterview, setSelectedInterview] = useState(false);
+  const handleLogout = async () => {
+    Swal.fire({
+      title: "ยืนยันการออกจากระบบ?",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonText: "ใช่, ออกจากระบบ"
+    }).then(result => {
+      if (result.isConfirmed) {
+        window.location.hash = "#/";
+        localStorage.removeItem("authUser");
+        setTimeout(() => {
+          setUser(null);
+        }, 100);
+      }
+    });
+  };
+  useEffect(() => {
+    const authUser = JSON.parse(localStorage.getItem("authUser") || "null");
+    if (authUser) {
+      setUser(authUser);
+    }
+  }, []);
+  useEffect(() => {
+    if (user) {
+      localStorage.setItem("authUser", JSON.stringify(user));
+    }
+  }, [user]);
+  return /*#__PURE__*/React.createElement(HashRouter, null, /*#__PURE__*/React.createElement(Switch, null, /*#__PURE__*/React.createElement(Route, {
+    path: "/",
+    exact: true
+  }, /*#__PURE__*/React.createElement(MainLayout, {
+    user: user,
+    setUser: setUser,
+    onLogout: handleLogout,
+    onClickLogin: () => setAuthModalOpen(true)
+  }, /*#__PURE__*/React.createElement(HomePage, {
+    user: user,
+    onClickLogin: () => setAuthModalOpen(true)
+  }))), /*#__PURE__*/React.createElement(Route, {
+    path: "/events",
+    exact: true
+  }, /*#__PURE__*/React.createElement(MainLayout, {
+    user: user,
+    setUser: setUser,
+    onLogout: handleLogout,
+    onClickLogin: () => setAuthModalOpen(true)
+  }, /*#__PURE__*/React.createElement(EventsPage, null))), /*#__PURE__*/React.createElement(Route, {
+    path: "/events/slots",
+    exact: true
+  }, /*#__PURE__*/React.createElement(MainLayout, {
+    user: user,
+    setUser: setUser,
+    onLogout: handleLogout,
+    onClickLogin: () => setAuthModalOpen(true)
+  }, /*#__PURE__*/React.createElement(SlotsPage, {
+    user: user,
+    onClickLogin: () => setAuthModalOpen(true)
+  }))), /*#__PURE__*/React.createElement(Route, {
+    path: "/events/slots/edit"
+  }, /*#__PURE__*/React.createElement(MainLayout, {
+    user: user,
+    setUser: setUser,
+    onLogout: handleLogout,
+    onClickLogin: () => setAuthModalOpen(true)
+  }, /*#__PURE__*/React.createElement(EditSlotPage, {
+    user: user,
+    onClickLogin: () => setAuthModalOpen(true)
+  }))), /*#__PURE__*/React.createElement(Route, {
+    path: "/events/search"
+  }, /*#__PURE__*/React.createElement(MainLayout, {
+    user: user,
+    setUser: setUser,
+    onLogout: handleLogout,
+    onClickLogin: () => setAuthModalOpen(true)
+  }, /*#__PURE__*/React.createElement(EventSearchPage, null))), /*#__PURE__*/React.createElement(Route, {
+    path: "/checkqueue"
+  }, /*#__PURE__*/React.createElement(MainLayout, {
+    user: user,
+    setUser: setUser,
+    onLogout: handleLogout,
+    onClickLogin: () => setAuthModalOpen(true)
+  }, /*#__PURE__*/React.createElement(CheckQueuePage, {
+    user: user
+  })))), /*#__PURE__*/React.createElement(Route, {
+    path: "/interview",
+    exact: true
+  }, /*#__PURE__*/React.createElement(MainLayout, {
+    user: user,
+    setUser: setUser,
+    onLogout: handleLogout,
+    onClickLogin: () => setAuthModalOpen(true)
+  }, /*#__PURE__*/React.createElement(InterviewPage, {
+    user: user,
+    selectedInterview: selectedInterview,
+    setSelectedInterview: setSelectedInterview
+  }))), /*#__PURE__*/React.createElement(Route, {
+    path: "/interview/add"
+  }, /*#__PURE__*/React.createElement(MainLayout, {
+    user: user,
+    setUser: setUser,
+    onLogout: handleLogout,
+    onClickLogin: () => setAuthModalOpen(true)
+  }, /*#__PURE__*/React.createElement(AddInterviewPage, {
+    user: user
+  }))), /*#__PURE__*/React.createElement(Route, {
+    path: "/interview/edit"
+  }, /*#__PURE__*/React.createElement(MainLayout, {
+    user: user,
+    setUser: setUser,
+    onLogout: handleLogout,
+    onClickLogin: () => setAuthModalOpen(true)
+  }, /*#__PURE__*/React.createElement(EditInterviewPage, {
+    user: user
+  }))), /*#__PURE__*/React.createElement(Route, {
+    path: "/job-hiring"
+  }, /*#__PURE__*/React.createElement(MainLayout, {
+    user: user,
+    setUser: setUser,
+    onLogout: handleLogout,
+    onClickLogin: () => setAuthModalOpen(true)
+  }, /*#__PURE__*/React.createElement(JobHiringPage, null))), /*#__PURE__*/React.createElement(Route, {
+    path: "/manager-candidate",
+    exact: true
+  }, /*#__PURE__*/React.createElement(MainLayout, {
+    user: user,
+    setUser: setUser,
+    onLogout: handleLogout,
+    onClickLogin: () => setAuthModalOpen(true)
+  }, /*#__PURE__*/React.createElement(ManagerHomePage, {
+    user: user
+  }))), /*#__PURE__*/React.createElement(Route, {
+    path: "/manager-transaction",
+    exact: true
+  }, /*#__PURE__*/React.createElement(MainLayout, {
+    user: user,
+    setUser: setUser,
+    onLogout: handleLogout,
+    onClickLogin: () => setAuthModalOpen(true)
+  }, /*#__PURE__*/React.createElement(TransactionPage, {
+    user: user
+  }))), /*#__PURE__*/React.createElement(Route, {
+    path: "/system",
+    exact: true
+  }, /*#__PURE__*/React.createElement(SystemLayout, {
+    user: user,
+    setUser: setUser,
+    onLogout: handleLogout
+  }, /*#__PURE__*/React.createElement(SystemPage, {
+    user: user
+  }))), /*#__PURE__*/React.createElement(Route, {
+    path: "/system/manage-ta"
+  }, /*#__PURE__*/React.createElement(SystemLayout, {
+    user: user,
+    setUser: setUser,
+    onLogout: handleLogout
+  }, /*#__PURE__*/React.createElement(ManageTaPage, {
+    user: user
+  }))), /*#__PURE__*/React.createElement(Route, {
+    path: "/system/manage-manager"
+  }, /*#__PURE__*/React.createElement(SystemLayout, {
+    user: user,
+    setUser: setUser,
+    onLogout: handleLogout
+  }, /*#__PURE__*/React.createElement(ManageManagerPage, {
+    user: user
+  }))), /*#__PURE__*/React.createElement(Route, {
+    path: "/system/manage-events"
+  }, /*#__PURE__*/React.createElement(SystemLayout, {
+    user: user,
+    setUser: setUser,
+    onLogout: handleLogout
+  }, /*#__PURE__*/React.createElement(ManageEventsPage, {
+    user: user
+  }))), /*#__PURE__*/React.createElement(Route, {
+    path: "/system/manage-slots"
+  }, /*#__PURE__*/React.createElement(SystemLayout, {
+    user: user,
+    setUser: setUser,
+    onLogout: handleLogout
+  }, /*#__PURE__*/React.createElement(ManageSlotsPage, {
+    user: user
+  }))), /*#__PURE__*/React.createElement(Route, {
+    path: "/system/manage-job-hiring"
+  }, /*#__PURE__*/React.createElement(SystemLayout, {
+    user: user,
+    setUser: setUser,
+    onLogout: handleLogout
+  }, /*#__PURE__*/React.createElement(ManageJobHiringPage, null))), /*#__PURE__*/React.createElement(Route, {
+    path: "/system/pool-candidate"
+  }, /*#__PURE__*/React.createElement(SystemLayout, {
+    user: user,
+    setUser: setUser,
+    onLogout: handleLogout
+  }, /*#__PURE__*/React.createElement(PoolCandidatePage, {
+    user: user
+  }))), /*#__PURE__*/React.createElement(Route, {
+    path: "/system/add-link"
+  }, /*#__PURE__*/React.createElement(SystemLayout, {
+    user: user,
+    setUser: setUser,
+    onLogout: handleLogout
+  }, /*#__PURE__*/React.createElement(AddLinkInterviewPage, {
+    user: user
+  }))), /*#__PURE__*/React.createElement(Route, {
+    path: "/system/queue"
+  }, /*#__PURE__*/React.createElement(SystemLayout, {
+    user: user,
+    setUser: setUser,
+    onLogout: handleLogout
+  }, /*#__PURE__*/React.createElement(QueuePage, {
+    user: user
+  }))), /*#__PURE__*/React.createElement(AuthModal, {
+    isOpen: isAuthModalOpen,
+    onClose: () => setAuthModalOpen(false),
+    onLoginSuccess: user => setUser(user)
+  }), /*#__PURE__*/React.createElement(UserInterviewDetailModal, {
+    interview: selectedInterview,
+    isOpen: !!selectedInterview,
+    user: user,
+    onClose: () => setSelectedInterview(null)
+  }));
+};
+
+// Render
+ReactDOM.createRoot(document.getElementById("root")).render(/*#__PURE__*/React.createElement(App, null));</script>

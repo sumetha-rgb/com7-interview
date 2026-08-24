@@ -1,0 +1,50 @@
+<script type="text/javascript">var TransactionTable = ({
+  transactions
+}) => {
+  const formatDate = dateString => {
+    if (!dateString) return "-";
+    const date = new Date(dateString);
+    if (date.getFullYear() > 2400) date.setFullYear(date.getFullYear() - 543);
+    return date.toLocaleDateString("th-TH", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit"
+    });
+  };
+  const getStatusStyle = status => {
+    switch (status) {
+      case "รอการพิจารณา":
+        return "bg-yellow-100 text-yellow-700 border-yellow-200";
+      case "ผ่าน":
+        return "bg-green-100 text-green-700 border-green-200";
+      case "ไม่ผ่าน":
+        return "bg-red-100 text-red-700 border-red-200";
+      case "ไม่ผ่านการพิจารณา":
+        return "bg-red-100 text-red-700 border-red-200";
+      case "เก็บไว้พิจารณา":
+        return "bg-gray-100 text-gray-700 border-gray-200";
+      default:
+        return "bg-yellow-100 text-yellow-700 border-yellow-200";
+    }
+  };
+  return /*#__PURE__*/React.createElement("div", {
+    className: "overflow-x-auto shadow-md rounded-lg border border-base-200 mt-4"
+  }, /*#__PURE__*/React.createElement("table", {
+    className: "table table-zebra w-full"
+  }, /*#__PURE__*/React.createElement("thead", {
+    className: "bg-base-200 text-gray-500"
+  }, /*#__PURE__*/React.createElement("tr", {
+    className: "font-normal"
+  }, /*#__PURE__*/React.createElement("td", {
+    className: "text-center"
+  }, "\u0E25\u0E33\u0E14\u0E31\u0E1A"), /*#__PURE__*/React.createElement("td", null, "\u0E0A\u0E37\u0E48\u0E2D-\u0E2A\u0E01\u0E38\u0E25"), /*#__PURE__*/React.createElement("td", null, "\u0E0A\u0E37\u0E48\u0E2D\u0E1C\u0E39\u0E49\u0E2A\u0E21\u0E31\u0E04\u0E23"), /*#__PURE__*/React.createElement("td", null, "\u0E40\u0E1B\u0E25\u0E35\u0E48\u0E22\u0E19\u0E2A\u0E16\u0E32\u0E19\u0E30"), /*#__PURE__*/React.createElement("td", null, "\u0E40\u0E27\u0E25\u0E32\u0E17\u0E35\u0E48\u0E40\u0E1B\u0E25\u0E35\u0E48\u0E22\u0E19\u0E2A\u0E16\u0E32\u0E19\u0E30"))), /*#__PURE__*/React.createElement("tbody", null, transactions.map((row, index) => /*#__PURE__*/React.createElement("tr", {
+    key: index,
+    className: "hover:bg-base-200"
+  }, /*#__PURE__*/React.createElement("th", {
+    className: "text-center"
+  }, index + 1), /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("div", null, row.Name)), /*#__PURE__*/React.createElement("td", null, row.Candidate_Name), /*#__PURE__*/React.createElement("td", null, "\u0E04\u0E38\u0E13\u0E44\u0E14\u0E49\u0E40\u0E1B\u0E25\u0E35\u0E48\u0E22\u0E19\u0E2A\u0E16\u0E32\u0E19\u0E30\u0E40\u0E1B\u0E47\u0E19", " ", /*#__PURE__*/React.createElement("span", {
+    className: `badge badge-sm ${getStatusStyle(row.Status_Changes)}`
+  }, row.Status_Changes)), /*#__PURE__*/React.createElement("td", null, formatDate(row.TimeStamp)))))));
+};</script>

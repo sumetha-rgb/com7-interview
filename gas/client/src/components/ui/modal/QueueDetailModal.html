@@ -1,0 +1,139 @@
+<script type="text/javascript">
+  // Popup รายละเอียดคิว ออกแบบใหม่เฉพาะสำหรับหน้าระบบจัดการคิว (QueuePage)
+  // แสดงเฉพาะข้อมูลที่จำเป็นสำหรับ Staff หน้างาน: ลำดับคิว, อีเวนต์, ชื่อ, ช่วงเวลา,
+  // ตำแหน่งที่สนใจ, เวลาเช็คชื่อ, ผู้เช็คชื่อ, สถานะอีเมล และปุ่มปรับสถานะ
+  var QueueDetailModal = ({ interview, isOpen, onClose, onToggleCheckIn, isToggling }) => {
+    if (!isOpen || !interview) return null;
+
+    const {
+      Interview_Id, Fullname, Position_Applied, Interview_Period,
+      joinedAt, approvedBy, queueNo, Queue_Display_Status, Queue_Admin_Status, Employee_Category, Position_Type,
+      indexNum
+    } = interview;
+
+    const displayQueueNo = queueNo || indexNum || "-";
+    const { Event_Name } = interview.eventDetail || {};
+
+    const rawCheckInStatus = String(Queue_Display_Status || "").trim();
+    const checkInStatus = rawCheckInStatus === "รอเช็คชื่อ" ? "ยังไม่เช็คชื่อ" : (rawCheckInStatus || "ยังไม่เช็คชื่อ");
+    const interviewStatus = String(Queue_Admin_Status || "").trim() || "ยังไม่สัมภาษณ์";
+    const isCheckedIn = checkInStatus === "เช็คชื่อแล้ว";
+    const isNotJoined = checkInStatus === "ไม่เข้าร่วม";
+
+    const checkInStatusStyle = isCheckedIn
+      ? { bg: "#dcfce7", color: "#15803d", border: "#86efac", label: "เช็คชื่อแล้ว", icon: "fa-circle-check" }
+      : isNotJoined
+        ? { bg: "#fee2e2", color: "#dc2626", border: "#fca5a5", label: "ไม่เข้าร่วม", icon: "fa-circle-xmark" }
+        : { bg: "#fef9c3", color: "#854d0e", border: "#fde047", label: "ยังไม่เช็คชื่อ", icon: "fa-clock" };
+
+    const interviewStatusStyle = interviewStatus === "สัมภาษณ์แล้ว"
+      ? { bg: "#dcfce7", color: "#15803d", border: "#86efac", label: "สัมภาษณ์แล้ว", icon: "fa-circle-check" }
+      : interviewStatus === "ไม่เข้าร่วม"
+        ? { bg: "#fee2e2", color: "#dc2626", border: "#fca5a5", label: "ไม่เข้าร่วม", icon: "fa-circle-xmark" }
+        : { bg: "#fef9c3", color: "#854d0e", border: "#fde047", label: "ยังไม่สัมภาษณ์", icon: "fa-clock" };
+
+    const selectStatusStyle = interviewStatus === "สัมภาษณ์แล้ว"
+      ? { color: "#166534", background: "#d1fae5", borderColor: "#34d399" }
+      : interviewStatus === "ไม่เข้าร่วม"
+        ? { color: "#991b1c", background: "#fee2e2", borderColor: "#fca5a5" }
+        : { color: "#92400e", background: "#fef3c7", borderColor: "#fde68a" };
+
+    // ตัวเลือกสำหรับ Dropdown ปรับสถานะ (แอดมินปรับสถานะเองเท่านั้น ไม่มีการส่งอีเมล)
+    const ADMIN_STATUS_OPTIONS = [
+      { value: "ยังไม่สัมภาษณ์", label: "ยังไม่สัมภาษณ์" },
+      { value: "สัมภาษณ์แล้ว", label: "สัมภาษณ์แล้ว" },
+      { value: "ไม่เข้าร่วม", label: "ไม่เข้าร่วม" },
+    ];
+
+    const InfoRow = ({ icon, label, value, valueColor }) =>
+      React.createElement("div", { className: "flex items-start gap-3 py-2.5 border-b border-slate-100 last:border-b-0" },
+        React.createElement("div", { className: "w-7 h-7 rounded-md bg-slate-100 flex items-center justify-center shrink-0 mt-0.5" },
+          React.createElement("i", { className: `fa-solid ${icon} text-slate-400 text-xs` })
+        ),
+        React.createElement("div", { className: "min-w-0 flex-1" },
+          React.createElement("p", { className: "text-[11px] text-slate-400 leading-none mb-1" }, label),
+          React.createElement("p", { className: "text-sm font-medium text-slate-800 break-words", style: valueColor ? { color: valueColor } : {} }, value || "-")
+        )
+      );
+
+    return React.createElement("div", {
+      className: "fixed inset-0 z-[100] flex items-center justify-center p-4",
+      style: { background: "rgba(15, 23, 42, 0.45)", backdropFilter: "blur(2px)" },
+      onClick: onClose
+    },
+      React.createElement("div", {
+        className: "bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden animate-fade-in-up",
+        onClick: (e) => e.stopPropagation()
+      },
+        // Header
+        React.createElement("div", {
+          className: "px-5 pt-5 pb-4",
+          style: { background: "linear-gradient(135deg, #166534 0%, #15803d 100%)" }
+        },
+          React.createElement("div", { className: "flex items-start justify-between" },
+            React.createElement("div", {},
+              React.createElement("p", { className: "text-emerald-100 text-[11px] tracking-wide mb-1" }, "ลำดับคิว"),
+              React.createElement("div", { className: "text-4xl font-extrabold text-white leading-none" }, displayQueueNo)
+            ),
+            React.createElement("button", {
+              onClick: onClose,
+              className: "w-8 h-8 rounded-full bg-white/15 hover:bg-white/25 text-white flex items-center justify-center transition-colors"
+            }, React.createElement("i", { className: "fa-solid fa-xmark text-sm" }))
+          ),
+          React.createElement("div", { className: "mt-3" },
+            React.createElement("p", { className: "text-white font-semibold text-base truncate" }, Fullname || "-"),
+            React.createElement("p", { className: "text-emerald-100 text-xs truncate mt-0.5" }, Event_Name || "-")
+          )
+        ),
+
+        // Status badge strip
+        React.createElement("div", { className: "px-5 -mt-3 flex flex-wrap gap-2" },
+          React.createElement("div", {
+            className: "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold shadow-sm border",
+            style: { background: checkInStatusStyle.bg, color: checkInStatusStyle.color, borderColor: checkInStatusStyle.border }
+          },
+            React.createElement("i", { className: `fa-solid ${checkInStatusStyle.icon}` }),
+            checkInStatusStyle.label
+          ),
+          React.createElement("div", {
+            className: "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold shadow-sm border",
+            style: { background: interviewStatusStyle.bg, color: interviewStatusStyle.color, borderColor: interviewStatusStyle.border }
+          },
+            React.createElement("i", { className: `fa-solid ${interviewStatusStyle.icon}` }),
+            interviewStatusStyle.label
+          )
+        ),
+
+        // Body
+        React.createElement("div", { className: "px-5 pt-4 pb-2" },
+          InfoRow({ icon: "fa-users", label: "ตำแหน่งที่สมัคร", value: Position_Applied }),
+          InfoRow({ icon: "fa-clock", label: "ช่วงเวลาสัมภาษณ์", value: Interview_Period }),
+          InfoRow({ icon: "fa-user-check", label: "เวลาเช็คชื่อ", value: joinedAt, valueColor: joinedAt && joinedAt !== "-" ? "#059669" : undefined }),
+          InfoRow({ icon: "fa-user-shield", label: "ผู้เช็คชื่อ", value: approvedBy })
+        ),
+
+        // Action — Dropdown ปรับสถานะ
+        React.createElement("div", { className: "px-5 pb-5 pt-1" },
+          React.createElement("p", { className: "text-[11px] font-semibold text-slate-400 uppercase tracking-wide mb-2" }, "ปรับสถานะ"),
+          isToggling
+            ? React.createElement("div", { className: "h-10 flex items-center justify-center" },
+                React.createElement("span", { className: "loading loading-spinner loading-sm text-emerald-500" }))
+            : React.createElement("div", { className: "relative" },
+                React.createElement("select", {
+                  className: "select select-bordered select-primary w-full h-12 min-h-0 text-sm pr-10 rounded-xl shadow-sm bg-white border-slate-200 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100",
+                  value: interviewStatus,
+                  onChange: (e) => onToggleCheckIn(interview, e.target.value)
+                },
+                  ADMIN_STATUS_OPTIONS.map((opt) =>
+                    React.createElement("option", { key: opt.value, value: opt.value }, opt.label)
+                  )
+                ),
+                React.createElement("span", {
+                  className: "absolute inset-y-0 right-3 flex items-center pointer-events-none text-slate-400"
+                }, React.createElement("i", { className: "fa-solid fa-chevron-down text-[10px]" }))
+              )
+        )
+      )
+    );
+  };
+</script>

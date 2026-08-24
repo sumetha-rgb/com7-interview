@@ -1,0 +1,284 @@
+<script type="text/javascript">var PoolCandidatePage = ({
+  user
+}) => {
+  const [search, setSearch] = useState("");
+  const [eventName, setEventName] = useState("");
+  const [province, setProvince] = useState("");
+  const [page, setPage] = useState(1);
+  const limit = 15;
+  const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingLocation, setIsLoadingLocation] = useState(false);
+  const [candidateData, setCandidateData] = useState([]);
+  const [paginationData, setPaginationData] = useState({});
+  const [events, setEvents] = useState([]);
+  const [provinceOptions, setProvinceOptions] = useState([]);
+  const [isClickDeleted, setIsClickDeleted] = useState(false);
+  const [isSeeMoreDetail, setIsSeeMoreDetail] = useState(null);
+  const [selectedDatas, setSelectedDatas] = useState([]);
+  const fetchInterviewData = () => {
+    setIsLoading(true);
+    const userRole = user.role;
+    const query = {
+      search,
+      eventName,
+      province,
+      page,
+      limit
+    };
+    google.script.run.withSuccessHandler(res => {
+      if (res.success === true) {
+        setCandidateData(res.data);
+        setPaginationData(res.pagination);
+      }
+      setIsLoading(false);
+    }).withFailureHandler(err => {
+      if (err) {
+        Swal.fire({
+          icon: "error",
+          title: "เกิดข้อผิดพลาด",
+          text: err.message,
+          timer: 2000
+        });
+      }
+      setIsLoading(false);
+    }).getAllInterviews(query, userRole);
+  };
+  const fetchEventName = () => {
+    google.script.run.withSuccessHandler(res => {
+      setEvents(res);
+    }).getEventNameDropdown(user.role);
+  };
+  const fetchThaiLocation = async () => {
+    setIsLoadingLocation(true);
+    try {
+      const response = await fetch("https://raw.githubusercontent.com/kongvut/thai-province-data/refs/heads/master/api/latest/province.json");
+      const data = await response.json();
+      const sortedData = data.sort((a, b) => a.name_th.localeCompare(b.name_th));
+      const provinces = sortedData.map(item => item.name_th);
+      setProvinceOptions(provinces);
+    } catch (error) {
+      console.error("Failed to fetch location data:", error);
+    } finally {
+      setIsLoadingLocation(false);
+    }
+  };
+  const handlePageChange = p => {
+    setPage(p);
+    window.scrollTo(0, 0);
+  };
+  const handleClear = () => {
+    setSearch("");
+    setEventName("");
+    setProvince("");
+    setPage(1);
+  };
+  const handleSubmit = e => {
+    e.preventDefault();
+    setPage(1);
+    fetchInterviewData();
+  };
+  const handleDelete = () => {
+    if (user && user.role !== "SUPERADMIN") {
+      Swal.fire({
+        icon: "error",
+        title: "เกิดข้อผิดพลาด",
+        text: "คุณไม่มีสิทธิ์ในการลบข้อมูล",
+        timer: 2000
+      });
+      return;
+    }
+    if (selectedDatas.length === 0) {
+      Swal.fire({
+        icon: "info",
+        title: "กรุณาเลือกข้อมูลที่ต้องการลบ"
+      });
+      return;
+    }
+    const firstSelected = selectedDatas[0];
+    const userRole = user.role;
+    const userName = user.name;
+    const userId = user.userId;
+    const eventId = firstSelected?.eventDetail?.Sheet_ID;
+    const allSelectedIds = selectedDatas.map(data => data.Interview_Id);
+    Swal.fire({
+      title: "คุณยืนยันใช่ไหมว่าผู้สมัครไม่ผ่านการพิจารณา?",
+      text: "กรุณาตรวจสอบความถูกต้องก่อนกดยืนยัน",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonText: "ยืนยัน",
+      cancelButtonText: "ยกเลิก",
+      showLoaderOnConfirm: true,
+      preConfirm: () => {
+        const payload = {
+          userRole,
+          userName,
+          userId,
+          eventId,
+          interviewIds: allSelectedIds
+        };
+        return new Promise((resolve, reject) => {
+          google.script.run.withSuccessHandler(res => {
+            if (res.success) {
+              resolve(res); // ส่งข้อมูลไปยัง .then()
+            } else {
+              Swal.showValidationMessage(`เกิดข้อผิดพลาด: ${res.message}`);
+              resolve(false);
+            }
+          }).withFailureHandler(err => {
+            Swal.showValidationMessage(`การเชื่อมต่อล้มเหลว: ${err.message}`);
+            resolve(false);
+          }).deleteInterview(payload);
+        });
+      },
+      allowOutsideClick: () => !Swal.isLoading()
+    }).then(result => {
+      if (!result.isConfirmed) {
+        return;
+      }
+      setIsClickDeleted(false);
+      setSelectedDatas([]);
+      handleClear();
+      fetchInterviewData();
+      Swal.fire({
+        icon: "success",
+        title: "เปลี่ยนสถานะเรียบร้อยแล้ว",
+        text: result.value.message,
+        timer: 2000,
+        showConfirmButton: false
+      });
+    });
+  };
+  useEffect(() => {
+    fetchInterviewData();
+  }, [page]);
+  useEffect(() => {
+    fetchEventName();
+    fetchThaiLocation();
+  }, []);
+  return /*#__PURE__*/React.createElement("div", {
+    className: "w-full max-w-7xl xl:max-w-[1440px] mx-auto pb-24 px-4 sm:px-6"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex flex-col md:flex-row justify-between items-start md:items-end mb-6 gap-4 animate-fade-in-up"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "text-center sm:text-start"
+  }, /*#__PURE__*/React.createElement(SystemHeader, {
+    title: "\u0E10\u0E32\u0E19\u0E02\u0E49\u0E2D\u0E21\u0E39\u0E25\u0E1C\u0E39\u0E49\u0E2A\u0E21\u0E31\u0E04\u0E23",
+    subTitle: "\u0E08\u0E31\u0E14\u0E01\u0E32\u0E23\u0E41\u0E25\u0E30\u0E15\u0E23\u0E27\u0E08\u0E2A\u0E2D\u0E1A\u0E23\u0E32\u0E22\u0E0A\u0E37\u0E48\u0E2D\u0E1C\u0E39\u0E49\u0E2A\u0E21\u0E31\u0E04\u0E23\u0E43\u0E19\u0E23\u0E30\u0E1A\u0E1A"
+  })), paginationData && paginationData.totalItems > 0 && /*#__PURE__*/React.createElement("div", {
+    className: "bg-emerald-50 text-emerald-700 px-4 py-2 rounded-lg text-sm font-medium border border-emerald-100"
+  }, "\u0E1E\u0E1A\u0E02\u0E49\u0E2D\u0E21\u0E39\u0E25\u0E17\u0E31\u0E49\u0E07\u0E2B\u0E21\u0E14", " ", /*#__PURE__*/React.createElement("span", {
+    className: "font-bold text-emerald-800"
+  }, paginationData.totalItems), " ", "\u0E23\u0E32\u0E22\u0E01\u0E32\u0E23")), /*#__PURE__*/React.createElement("form", {
+    onSubmit: handleSubmit,
+    className: "bg-base-100 p-5 rounded-2xl shadow-sm border border-base-300 mb-8 animate-fade-in-up"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex flex-col lg:flex-row gap-4 items-end"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "w-full lg:flex-[2]"
+  }, /*#__PURE__*/React.createElement("label", {
+    className: "text-xs font-semibold text-gray-500 mb-1.5 ml-1 block"
+  }, "\u0E04\u0E33\u0E04\u0E49\u0E19\u0E2B\u0E32 (\u0E0A\u0E37\u0E48\u0E2D, \u0E02\u0E49\u0E2D\u0E21\u0E39\u0E25\u0E17\u0E31\u0E48\u0E27\u0E44\u0E1B)"), /*#__PURE__*/React.createElement(InputField, {
+    name: "search",
+    type: "text",
+    value: search,
+    onChange: e => setSearch(e.target.value),
+    placeholder: "\uD83D\uDD0D \u0E04\u0E49\u0E19\u0E2B\u0E32\u0E0A\u0E37\u0E48\u0E2D\u0E1C\u0E39\u0E49\u0E2A\u0E21\u0E31\u0E04\u0E23...",
+    className: "w-full"
+  })), /*#__PURE__*/React.createElement("div", {
+    className: "w-full lg:flex-[3] grid grid-cols-1 sm:grid-cols-2 gap-4"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "w-full relative z-20"
+  }, /*#__PURE__*/React.createElement("label", {
+    className: "text-xs font-semibold text-gray-500 mb-1.5 ml-1 block"
+  }, "\u0E2D\u0E35\u0E40\u0E27\u0E19\u0E15\u0E4C"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: "relative",
+      zIndex: 30
+    }
+  }, /*#__PURE__*/React.createElement(SearchableSelect, {
+    name: "eventName",
+    value: eventName || "",
+    onChange: e => setEventName(e.target.value),
+    options: events,
+    placeholder: "\u0E17\u0E31\u0E49\u0E07\u0E2B\u0E21\u0E14"
+  }))), /*#__PURE__*/React.createElement("div", {
+    className: "w-full relative z-20"
+  }, /*#__PURE__*/React.createElement("label", {
+    className: "text-xs font-semibold text-gray-500 mb-1.5 ml-1 block"
+  }, "\u0E08\u0E31\u0E07\u0E2B\u0E27\u0E31\u0E14"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: "relative",
+      zIndex: 30
+    }
+  }, /*#__PURE__*/React.createElement(SearchableSelect, {
+    name: "provice",
+    value: province || "",
+    onChange: e => setProvince(e.target.value),
+    options: provinceOptions,
+    placeholder: "\u0E17\u0E38\u0E01\u0E08\u0E31\u0E07\u0E2B\u0E27\u0E31\u0E14"
+  })))), /*#__PURE__*/React.createElement("div", {
+    className: "w-full lg:w-auto flex gap-2 pt-2 lg:pt-0"
+  }, user && (user.role === "SUPERADMIN" || user.role === "ADMIN") && /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: () => setIsClickDeleted(!isClickDeleted),
+    className: `btn btn-ghost ${!isClickDeleted && " text-red-500 hover:bg-red-100 border-red-200"}`,
+    disabled: isLoading,
+    title: "\u0E40\u0E1B\u0E25\u0E35\u0E48\u0E22\u0E19\u0E2A\u0E16\u0E32\u0E19\u0E30"
+  }, isClickDeleted ? "ยกเลิก" : "เปลี่ยนสถานะ"), isClickDeleted ? /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: handleDelete,
+    className: "btn btn-ghost text-red-500 hover:bg-red-100 border-red-200",
+    disabled: isLoading,
+    title: "\u0E40\u0E1B\u0E25\u0E35\u0E48\u0E22\u0E19\u0E2A\u0E16\u0E32\u0E19\u0E30"
+  }, "\u0E40\u0E1B\u0E25\u0E35\u0E48\u0E22\u0E19\u0E2A\u0E16\u0E32\u0E19\u0E30") : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: handleClear,
+    className: "btn btn-ghost text-gray-500 hover:bg-slate-100 border-slate-200",
+    disabled: isLoading,
+    title: "\u0E25\u0E49\u0E32\u0E07\u0E04\u0E48\u0E32\u0E01\u0E32\u0E23\u0E04\u0E49\u0E19\u0E2B\u0E32"
+  }, "\u0E25\u0E49\u0E32\u0E07\u0E04\u0E48\u0E32"), /*#__PURE__*/React.createElement("button", {
+    type: "submit",
+    className: "btn bg-emerald-600 hover:bg-emerald-700 text-white border-none shadow-md hover:shadow-lg flex-1 lg:flex-none px-6 gap-2",
+    disabled: isLoading
+  }, "\u0E04\u0E49\u0E19\u0E2B\u0E32"))))), isLoading ? /*#__PURE__*/React.createElement("div", {
+    className: "w-full py-20 flex flex-col items-center justify-center text-slate-400 gap-3"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "loading loading-dots loading-lg text-emerald-500"
+  }), /*#__PURE__*/React.createElement("p", {
+    className: "text-sm font-light"
+  }, "\u0E01\u0E33\u0E25\u0E31\u0E07\u0E42\u0E2B\u0E25\u0E14\u0E02\u0E49\u0E2D\u0E21\u0E39\u0E25...")) : /*#__PURE__*/React.createElement("div", {
+    className: "animate-fade-in-up"
+  }, candidateData.length > 0 ? /*#__PURE__*/React.createElement("div", {
+    className: "z-1"
+  }, /*#__PURE__*/React.createElement(CandidateTable, {
+    candidates: candidateData,
+    isClickDeleted: isClickDeleted,
+    setIsSeeMoreDetail: setIsSeeMoreDetail,
+    selectedDatas: selectedDatas,
+    setSelectedDatas: setSelectedDatas,
+    user: user
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "mt-6 flex justify-center"
+  }, /*#__PURE__*/React.createElement(PagePagination, {
+    currentPage: paginationData.currentPage || 1,
+    totalPages: paginationData.totalPages || 1,
+    onPageChange: handlePageChange
+  }))) :
+  /*#__PURE__*/
+  // Empty State ที่สวยงามขึ้น
+  React.createElement("div", {
+    className: "w-full py-16 flex flex-col items-center justify-center border-2 border-dashed border-slate-200 rounded-2xl bg-slate-50/50"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "text-4xl mb-2"
+  }, "\uD83D\uDCC4"), /*#__PURE__*/React.createElement("p", {
+    className: "text-gray-500 font-medium"
+  }, "\u0E44\u0E21\u0E48\u0E1E\u0E1A\u0E02\u0E49\u0E2D\u0E21\u0E39\u0E25\u0E1C\u0E39\u0E49\u0E2A\u0E21\u0E31\u0E04\u0E23"), /*#__PURE__*/React.createElement("p", {
+    className: "text-slate-400 text-sm mt-1"
+  }, "\u0E25\u0E2D\u0E07\u0E1B\u0E23\u0E31\u0E1A\u0E40\u0E1B\u0E25\u0E35\u0E48\u0E22\u0E19\u0E04\u0E33\u0E04\u0E49\u0E19\u0E2B\u0E32\u0E2B\u0E23\u0E37\u0E2D\u0E15\u0E31\u0E27\u0E01\u0E23\u0E2D\u0E07\u0E43\u0E2B\u0E21\u0E48\u0E2D\u0E35\u0E01\u0E04\u0E23\u0E31\u0E49\u0E07"))), isSeeMoreDetail && /*#__PURE__*/React.createElement(InterviewDetailModal, {
+    interview: isSeeMoreDetail,
+    isOpen: !!isSeeMoreDetail,
+    onClose: () => setIsSeeMoreDetail(null),
+    user: user,
+    onRefresh: fetchInterviewData
+  }));
+};</script>

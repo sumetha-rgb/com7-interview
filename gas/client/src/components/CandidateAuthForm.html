@@ -1,0 +1,296 @@
+<script type="text/javascript">var {
+  useState
+} = React;
+var CandidateAuthForm = ({
+  onClose,
+  onLoginSuccess,
+  isLoading,
+  setIsLoading,
+  onClickForgotPassword
+}) => {
+  const [formData, setFormData] = useState({
+    title: "นาย",
+    name: "",
+    email: "",
+    password: "",
+    phone: ""
+  });
+  const [profile, setProfile] = useState(null);
+  const [isLogin, setIsLogin] = useState(true);
+  const [showPassword, setShowPassword] = useState(false);
+  const handleChange = e => {
+    const {
+      name,
+      value
+    } = e.target;
+    setFormData({
+      ...formData,
+      [name]: value
+    });
+  };
+  const readFileAsBase64 = file => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = error => reject(error);
+      reader.readAsDataURL(file);
+    });
+  };
+  const handleLoginSubmit = e => {
+    e.preventDefault();
+    setIsLoading(true);
+    google.script.run.withSuccessHandler(res => {
+      if (res.success === true) {
+        onLoginSuccess(res.data);
+        onClose();
+        Swal.fire({
+          icon: "success",
+          title: res.message,
+          timer: 2000
+        });
+      } else {
+        Swal.fire({
+          icon: "error",
+          title: res.message,
+          timer: 2000
+        });
+      }
+      setIsLoading(false);
+    }).withFailureHandler(err => {
+      Swal.fire({
+        icon: "error",
+        title: "เกิดข้อผิดพลาด",
+        text: err.message || "เกิดข้อผิดพลาดในการเข้าสู่ระบบ",
+        timer: 2000
+      });
+      setIsLoading(false);
+    }).loginUser(formData);
+  };
+  const handleRegisterSubmit = async e => {
+    e.preventDefault();
+    if (!profile) {
+      Swal.fire({
+        icon: "warning",
+        title: "กรุณาแบบรูปโปรไฟล์"
+      });
+      return;
+    }
+    const max_size = 5 * 1024 * 1024; // 5MB
+
+    if (profile && profile.size > max_size) {
+      Swal.fire({
+        icon: "warning",
+        title: "ขนาดไฟล์ไม่เกิน 5MB"
+      });
+      return;
+    }
+    try {
+      setIsLoading(true);
+      const base64Data = await readFileAsBase64(profile);
+      const payload = {
+        ...formData,
+        fullname: `${formData.title} ${formData.name}`,
+        profile: {
+          base64Data,
+          fileName: profile.name,
+          mimeType: profile.type
+        }
+      };
+      google.script.run.withSuccessHandler(res => {
+        if (res.success === true) {
+          onLoginSuccess(res.data);
+          onClose();
+          Swal.fire({
+            icon: "success",
+            title: res.message,
+            timer: 2000
+          });
+        } else {
+          Swal.fire({
+            icon: "error",
+            title: res.message,
+            timer: 2000
+          });
+        }
+        setIsLoading(false);
+      }).withFailureHandler(err => {
+        Swal.fire({
+          icon: "error",
+          title: "เกิดข้อผิดพลาด",
+          text: err.message || "เกิดข้อผิดพลาดในการสมัครสมาชิก",
+          timer: 2000
+        });
+        setIsLoading(false);
+      }).registerUser(payload);
+    } catch (error) {
+      Swal.fire({
+        icon: "error",
+        title: error.message || "ลงชื่อเข้าใช้ล้มเหลว"
+      });
+      setIsLoading(false);
+    }
+  };
+  return /*#__PURE__*/React.createElement("div", {
+    className: "w-full space-y-5 animate-fade-in"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center gap-2"
+  }, /*#__PURE__*/React.createElement("img", {
+    src: "https://drive.google.com/thumbnail?id=1INCNKnZiGOhVipsjSy62m3EamgKdoDpn",
+    alt: "user-logo",
+    className: "size-7 sm:size-8 rounded-full"
+  }), /*#__PURE__*/React.createElement("p", {
+    className: "font-semibold text-emerald-700 text-lg sm:text-xl"
+  }, "\u0E2A\u0E33\u0E2B\u0E23\u0E31\u0E1A\u0E1C\u0E39\u0E49\u0E2A\u0E21\u0E31\u0E04\u0E23")), /*#__PURE__*/React.createElement("form", {
+    onSubmit: isLogin ? handleLoginSubmit : handleRegisterSubmit,
+    className: "w-full text-sm space-y-3"
+  }, !isLogin && /*#__PURE__*/React.createElement("div", {
+    className: "flex flex-col gap-1"
+  }, /*#__PURE__*/React.createElement("label", {
+    htmlFor: "name",
+    className: "flex gap-2"
+  }, "\u0E0A\u0E37\u0E48\u0E2D-\u0E19\u0E32\u0E21\u0E2A\u0E01\u0E38\u0E25", " ", /*#__PURE__*/React.createElement("span", {
+    className: "text-xs sm:text-sm text-red-500"
+  }, "*")), /*#__PURE__*/React.createElement("div", {
+    className: "flex flex-row gap-2"
+  }, /*#__PURE__*/React.createElement("select", {
+    className: "select select-bordered w-24 focus:outline-none",
+    name: "title",
+    id: "title",
+    onChange: handleChange,
+    value: formData.title,
+    required: true
+  }, /*#__PURE__*/React.createElement("option", {
+    value: "\u0E19\u0E32\u0E22"
+  }, "\u0E19\u0E32\u0E22"), /*#__PURE__*/React.createElement("option", {
+    value: "\u0E19\u0E32\u0E07"
+  }, "\u0E19\u0E32\u0E07"), /*#__PURE__*/React.createElement("option", {
+    value: "\u0E19\u0E32\u0E07\u0E2A\u0E32\u0E27"
+  }, "\u0E19\u0E32\u0E07\u0E2A\u0E32\u0E27")), /*#__PURE__*/React.createElement("input", {
+    type: "text",
+    className: "w-full input border rounded-md px-3 focus-within:border-blue-500 focus:outline-none",
+    id: "name",
+    name: "name",
+    onChange: handleChange,
+    placeholder: "\u0E01\u0E23\u0E2D\u0E01\u0E0A\u0E37\u0E48\u0E2D-\u0E19\u0E32\u0E21\u0E2A\u0E01\u0E38\u0E25",
+    required: true
+  }))), /*#__PURE__*/React.createElement("div", {
+    className: "flex flex-col gap-1"
+  }, /*#__PURE__*/React.createElement("label", {
+    htmlFor: "email",
+    className: "flex gap-2"
+  }, "\u0E2D\u0E35\u0E40\u0E21\u0E25", " ", !isLogin ? /*#__PURE__*/React.createElement("span", {
+    className: "text-xs sm:text-sm text-red-500"
+  }, "* \u0E02\u0E2D\u0E04\u0E27\u0E32\u0E21\u0E01\u0E23\u0E38\u0E13\u0E32\u0E43\u0E0A\u0E49\u0E2D\u0E35\u0E40\u0E21\u0E25\u0E1B\u0E31\u0E08\u0E08\u0E38\u0E1A\u0E31\u0E19 \u0E40\u0E19\u0E37\u0E48\u0E2D\u0E07\u0E08\u0E32\u0E01\u0E17\u0E48\u0E32\u0E19\u0E08\u0E30\u0E44\u0E21\u0E48\u0E2A\u0E32\u0E21\u0E32\u0E23\u0E16\u0E41\u0E01\u0E49\u0E44\u0E02\u0E2D\u0E35\u0E40\u0E21\u0E25\u0E44\u0E14\u0E49 (\u0E15\u0E31\u0E27\u0E1E\u0E34\u0E21\u0E1E\u0E4C\u0E40\u0E25\u0E47\u0E01\u0E40\u0E17\u0E48\u0E32\u0E19\u0E31\u0E49\u0E19)") : /*#__PURE__*/React.createElement("span", {
+    className: "text-xs sm:text-sm text-red-500"
+  }, "*")), /*#__PURE__*/React.createElement("input", {
+    type: "email",
+    className: "w-full input focus-within:border-none",
+    id: "email",
+    name: "email",
+    onChange: handleChange,
+    placeholder: "\u0E2D\u0E35\u0E40\u0E21\u0E25",
+    required: true
+  })), /*#__PURE__*/React.createElement("div", {
+    className: "relative flex flex-col gap-1"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex justify-between items-end"
+  }, /*#__PURE__*/React.createElement("label", {
+    htmlFor: "password",
+    className: "text-sm"
+  }, "\u0E23\u0E2B\u0E31\u0E2A\u0E1C\u0E48\u0E32\u0E19", " ", !isLogin && /*#__PURE__*/React.createElement("span", {
+    className: "text-xs text-red-500 font-normal"
+  }, "* (\u0E04\u0E27\u0E32\u0E21\u0E22\u0E32\u0E27\u0E2D\u0E22\u0E48\u0E32\u0E07\u0E19\u0E49\u0E2D\u0E22 6 \u0E15\u0E31\u0E27)")), isLogin && /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: () => onClickForgotPassword("candidate"),
+    className: "text-xs text-red-600 hover:underline focus:outline-none"
+  }, "\u0E25\u0E37\u0E21\u0E23\u0E2B\u0E31\u0E2A\u0E1C\u0E48\u0E32\u0E19?")), /*#__PURE__*/React.createElement("input", {
+    type: showPassword ? "text" : "password",
+    className: "w-full relative input focus-within:border-none",
+    id: "password",
+    name: "password",
+    onChange: handleChange,
+    placeholder: "\u0E23\u0E2B\u0E31\u0E2A\u0E1C\u0E48\u0E32\u0E19",
+    required: true
+  }), /*#__PURE__*/React.createElement("span", {
+    onClick: () => setShowPassword(!showPassword),
+    className: "absolute top-7 right-3 size-8 rounded-full hover:bg-base-300 cursor-pointer duration-200 active:scale-95 transform transition-all text-gray-600 flex items-center justify-center"
+  }, showPassword ? /*#__PURE__*/React.createElement("i", {
+    className: "fa-solid fa-eye-slash"
+  }) : /*#__PURE__*/React.createElement("i", {
+    className: "fa-solid fa-eye"
+  }))), !isLogin && /*#__PURE__*/React.createElement("div", {
+    className: "flex flex-col gap-1"
+  }, /*#__PURE__*/React.createElement("label", {
+    htmlFor: "phone",
+    className: "flex gap-2"
+  }, "\u0E40\u0E1A\u0E2D\u0E23\u0E4C\u0E42\u0E17\u0E23\u0E28\u0E31\u0E1E\u0E17\u0E4C", " ", /*#__PURE__*/React.createElement("span", {
+    className: "text-xs sm:text-sm text-red-500"
+  }, "* \u0E15\u0E31\u0E27\u0E2D\u0E22\u0E48\u0E32\u0E07: 0812345678")), /*#__PURE__*/React.createElement("input", {
+    type: "text",
+    className: "w-full input focus-within:border-none",
+    id: "phone",
+    name: "phone",
+    onChange: handleChange,
+    placeholder: "\u0E40\u0E1A\u0E2D\u0E23\u0E4C\u0E42\u0E17\u0E23\u0E28\u0E31\u0E1E\u0E17\u0E4C",
+    required: true
+  })), !isLogin && /*#__PURE__*/React.createElement("div", {
+    className: "flex flex-col gap-3"
+  }, /*#__PURE__*/React.createElement("label", {
+    htmlFor: "profile",
+    className: "flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2"
+  }, "\u0E23\u0E39\u0E1B\u0E42\u0E1B\u0E23\u0E44\u0E1F\u0E25\u0E4C", /*#__PURE__*/React.createElement("span", {
+    className: "text-xs sm:text-sm text-red-500 "
+  }, "* \u0E02\u0E2D\u0E04\u0E27\u0E32\u0E21\u0E01\u0E23\u0E38\u0E13\u0E32\u0E41\u0E19\u0E1A\u0E23\u0E39\u0E1B\u0E2B\u0E19\u0E49\u0E32\u0E15\u0E23\u0E07\u0E40\u0E17\u0E48\u0E32\u0E19\u0E31\u0E49\u0E19 \u0E41\u0E25\u0E30\u0E02\u0E19\u0E32\u0E14\u0E44\u0E21\u0E48\u0E40\u0E01\u0E34\u0E19 5MB")), /*#__PURE__*/React.createElement("input", {
+    type: "file",
+    accept: "image/*",
+    className: "file-input file-input-bordered w-full focus:outline-none",
+    id: "profile",
+    name: "profile",
+    onChange: e => e.target.files[0] && setProfile(e.target.files[0]),
+    required: true
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "mt-2 p-4 bg-gray-50 rounded-lg border border-dashed border-gray-300"
+  }, /*#__PURE__*/React.createElement("p", {
+    className: "text-sm text-gray-500 mb-3 font-medium"
+  }, "\u0E04\u0E33\u0E41\u0E19\u0E30\u0E19\u0E33\u0E01\u0E32\u0E23\u0E41\u0E1A\u0E19\u0E23\u0E39\u0E1B\u0E42\u0E1B\u0E23\u0E44\u0E1F\u0E25\u0E4C:"), /*#__PURE__*/React.createElement("div", {
+    className: "grid grid-cols-2 gap-4"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex flex-col items-center gap-2"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "relative w-full aspect-[3/4] max-w-[120px] rounded-lg overflow-hidden border-2 border-green-500 shadow-sm"
+  }, /*#__PURE__*/React.createElement("img", {
+    src: "https://i.pinimg.com/736x/b1/19/23/b11923d38780fee29cb9d5c24ea1c345.jpg",
+    alt: "\u0E15\u0E31\u0E27\u0E2D\u0E22\u0E48\u0E32\u0E07\u0E17\u0E35\u0E48\u0E16\u0E39\u0E01\u0E15\u0E49\u0E2D\u0E07",
+    className: "w-full h-full object-cover"
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "absolute bottom-0 inset-x-0 bg-green-500 text-white text-[10px] sm:text-xs text-center py-0.5"
+  }, "\u2705 \u0E16\u0E39\u0E01\u0E15\u0E49\u0E2D\u0E07")), /*#__PURE__*/React.createElement("span", {
+    className: "text-xs text-center text-gray-600"
+  }, "\u0E2B\u0E19\u0E49\u0E32\u0E15\u0E23\u0E07 \u0E40\u0E2B\u0E47\u0E19\u0E0A\u0E31\u0E14\u0E40\u0E08\u0E19")), /*#__PURE__*/React.createElement("div", {
+    className: "flex flex-col items-center gap-2"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "relative w-full aspect-[3/4] max-w-[120px] rounded-lg overflow-hidden border-2 border-red-500 shadow-sm opacity-80"
+  }, /*#__PURE__*/React.createElement("img", {
+    src: "https://f.ptcdn.info/516/032/000/1434522792-2-o.jpg",
+    alt: "\u0E15\u0E31\u0E27\u0E2D\u0E22\u0E48\u0E32\u0E07\u0E17\u0E35\u0E48\u0E44\u0E21\u0E48\u0E16\u0E39\u0E01\u0E15\u0E49\u0E2D\u0E07",
+    className: "w-full h-full object-cover grayscale"
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "absolute bottom-0 inset-x-0 bg-red-500 text-white text-[10px] sm:text-xs text-center py-0.5"
+  }, "\u274C \u0E44\u0E21\u0E48\u0E16\u0E39\u0E01\u0E15\u0E49\u0E2D\u0E07")), /*#__PURE__*/React.createElement("span", {
+    className: "text-xs text-center text-gray-600"
+  }, "\u0E44\u0E21\u0E48\u0E43\u0E0A\u0E48\u0E23\u0E39\u0E1B\u0E15\u0E31\u0E27\u0E40\u0E2D\u0E07/\u0E2A\u0E27\u0E21\u0E41\u0E27\u0E48\u0E19/\u0E2B\u0E21\u0E27\u0E01/\u0E2B\u0E31\u0E19\u0E02\u0E49\u0E32\u0E07"))))), /*#__PURE__*/React.createElement("button", {
+    type: "submit",
+    disabled: isLoading,
+    className: "w-full bg-emerald-600 hover:bg-emerald-500 py-2.5 text-white cursor-pointer rounded-box duration-200 mt-1 text-base"
+  }, isLoading ? /*#__PURE__*/React.createElement(Loader, null) : isLogin ? "เข้าสู่ระบบ" : "สมัครสมาชิก"), isLogin ? /*#__PURE__*/React.createElement("p", {
+    className: "text-center"
+  }, "\u0E22\u0E31\u0E07\u0E44\u0E21\u0E48\u0E21\u0E35\u0E1A\u0E31\u0E0D\u0E0A\u0E35\u0E43\u0E0A\u0E48\u0E44\u0E2B\u0E21?", " ", /*#__PURE__*/React.createElement("span", {
+    onClick: () => setIsLogin(false),
+    className: "text-emerald-600 underline cursor-pointer"
+  }, "\u0E2A\u0E21\u0E31\u0E04\u0E23\u0E2A\u0E21\u0E32\u0E0A\u0E34\u0E01")) : /*#__PURE__*/React.createElement("p", {
+    className: "text-center"
+  }, "\u0E21\u0E35\u0E1A\u0E31\u0E0D\u0E0A\u0E35\u0E2D\u0E22\u0E39\u0E48\u0E41\u0E25\u0E49\u0E27?", " ", /*#__PURE__*/React.createElement("span", {
+    onClick: () => setIsLogin(true),
+    className: "text-emerald-600 underline cursor-pointer"
+  }, "\u0E40\u0E02\u0E49\u0E32\u0E2A\u0E39\u0E48\u0E23\u0E30\u0E1A\u0E1A"))));
+};</script>

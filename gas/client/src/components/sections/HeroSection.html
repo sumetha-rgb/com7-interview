@@ -1,0 +1,42 @@
+<script type="text/javascript">var {
+  useState
+} = React;
+var HeroSection = ({
+  user,
+  onClickLogin
+}) => {
+  const [eventStucture, setEventStucture] = useState([]);
+  const [optionsLoading, setOptionsLoading] = useState(false);
+  const fetchFullStucture = () => {
+    setOptionsLoading(true);
+    google.script.run.withSuccessHandler(res => {
+      setEventStucture(res.data);
+      setOptionsLoading(false);
+    }).withFailureHandler(error => {
+      console.error(error);
+      setEventStucture([]);
+      setOptionsLoading(false);
+    }).getFullEventStructure();
+  };
+  useEffect(() => {
+    fetchFullStucture();
+  }, []);
+  return /*#__PURE__*/React.createElement("div", {
+    className: "py-20 sm:py-32 bg-hero bg-cover padding-container bg-center bg-no-repeat"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "w-full flex flex-col items-center justify-center gap-4 sm:gap-6 text-center animate-fade-in-up"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex flex-col gap-3 sm:gap-4 w-full text-center text-white mb-2"
+  }, /*#__PURE__*/React.createElement("h1", {
+    className: "text-3xl md:text-[40px] font-semibold"
+  }, "Interview Scheduling System"), /*#__PURE__*/React.createElement("h2", {
+    className: "text-lg md:text-2xl text-white text-nowrap"
+  }, "\u0E23\u0E30\u0E1A\u0E1A\u0E08\u0E2D\u0E07\u0E15\u0E32\u0E23\u0E32\u0E07\u0E2A\u0E31\u0E21\u0E20\u0E32\u0E29\u0E13\u0E4C")), /*#__PURE__*/React.createElement("div", {
+    className: "w-full xl:px-20"
+  }, /*#__PURE__*/React.createElement(EventBookingForm, {
+    events: eventStucture,
+    isLoading: optionsLoading,
+    user: user,
+    onClickLogin: onClickLogin
+  }))));
+};</script>

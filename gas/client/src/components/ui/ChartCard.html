@@ -1,0 +1,37 @@
+<script type="text/javascript">var ChartCard = ({
+  title,
+  type,
+  data,
+  options
+}) => {
+  const canvasRef = useRef(null);
+  const chartInstanceRef = useRef(null);
+  useEffect(() => {
+    if (canvasRef.current) {
+      if (chartInstanceRef.current) {
+        chartInstanceRef.current.destroy();
+      }
+      chartInstanceRef.current = new Chart(canvasRef.current, {
+        type: type,
+        data: data,
+        options: {
+          ...options,
+          responsive: true,
+          maintainAspectRatio: false
+        }
+      });
+    }
+    return () => {
+      if (chartInstanceRef.current) chartInstanceRef.current.destroy();
+    };
+  }, [data, type]);
+  return /*#__PURE__*/React.createElement("div", {
+    className: "bg-white p-5 rounded-xl h-80 shadow-sm flex flex-col overflow-hidden"
+  }, /*#__PURE__*/React.createElement("h4", {
+    className: "text-lg font-semibold text-gray-700 mb-2 truncate"
+  }, title), /*#__PURE__*/React.createElement("div", {
+    className: "relative flex-grow min-h-0"
+  }, /*#__PURE__*/React.createElement("canvas", {
+    ref: canvasRef
+  })));
+};</script>

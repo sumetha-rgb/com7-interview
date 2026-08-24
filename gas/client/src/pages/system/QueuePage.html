@@ -1,0 +1,680 @@
+<script type="text/javascript">
+  var QueuePage = ({ user }) => {
+    const { useState, useEffect, useRef } = React;
+
+    const [search, setSearch] = useState("");
+    const [eventName, setEventName] = useState("");
+    const [statusFilter, setStatusFilter] = useState("เช็คชื่อแล้ว");
+    const [employeeCategory, setEmployeeCategory] = useState("all");
+    const [statusCounts, setStatusCounts] = useState({ total: 0, checkedIn: 0, waiting: 0, absent: 0, interviewed: 0 });
+    const [page, setPage] = useState(1);
+    const limit = 20;
+    const [isLoading, setIsLoading] = useState(false);
+    const [candidateData, setCandidateData] = useState([]);
+    const [paginationData, setPaginationData] = useState({});
+    const [events, setEvents] = useState([]);
+    const [isSeeMoreDetail, setIsSeeMoreDetail] = useState(null);
+    const [autoRefresh, setAutoRefresh] = useState(false);
+    const [lastUpdated, setLastUpdated] = useState(null);
+    const [togglingId, setTogglingId] = useState(null);
+    const [statusOverrides, setStatusOverrides] = useState({});
+
+    const currentDateRef = useRef(new Date().toDateString());
+    const intervalRef = useRef(null);
+
+    // ── Auto-refresh interval config ──
+    // เดิม hardcode 20000ms (20s) ทำให้ยิง request ถี่เกินไปเมื่อมีแอดมินหลายคนเปิดพร้อมกัน
+    // ปรับเป็น 35s (ยังทันเวลาใช้งานจริง แต่ลดจำนวน request ลง ~43%)
+    // + ใส่ jitter สุ่ม 0-4s ต่อเครื่อง กันไม่ให้ทุกเครื่อง auto-refresh ชนกันพอดีเป๊ะ
+    // (ไม่กระทบ logic การดึง/แสดงผลข้อมูลใดๆ เปลี่ยนแค่ "ความถี่" ของการเรียก)
+    const AUTO_REFRESH_INTERVAL_MS = 35000;
+    const AUTO_REFRESH_JITTER_MS = Math.floor(Math.random() * 4000);
+
+    const isSuperAdmin = user && (user.role === "SUPERADMIN" || user.role === "ADMIN");
+
+    const CHECKIN_STATUS_OPTIONS = [
+      { value: "all", label: "ทั้งหมด" },
+      { value: "เช็คชื่อแล้ว", label: "เช็คชื่อแล้ว" },
+      { value: "ยังไม่สัมภาษณ์", label: "คนที่ยังไม่ได้เรียกสัมภาษณ์" },
+      { value: "สัมภาษณ์แล้ว", label: "สัมภาษณ์แล้ว" },
+      { value: "ไม่เข้าร่วม", label: "ไม่เข้าร่วม" },
+    ];
+
+    const ADMIN_STATUS_OPTIONS = [
+      { value: "ยังไม่สัมภาษณ์", label: "ยังไม่สัมภาษณ์" },
+      { value: "สัมภาษณ์แล้ว", label: "สัมภาษณ์แล้ว" },
+    ];
+
+    const EMPLOYEE_CATEGORY_OPTIONS = [
+      { value: "all", label: "ทั้งหมด" },
+      { value: "พนักงานหน้าร้าน", label: "พนักงานหน้าร้าน" },
+      { value: "ออฟฟิศ", label: "ออฟฟิศ" },
+    ];
+
+    const fetchInterviewData = () => {
+      setIsLoading(true);
+      const userRole = user.role;
+      const query = { search, eventName, statusFilter, employeeCategory, page, limit };
+
+      google.script.run
+        .withSuccessHandler((res) => {
+          if (!res) {
+            console.error("Backend returned null response.");
+            Swal.fire({
+              icon: "error",
+              title: "ไม่พบข้อมูล",
+              text: "ระบบไม่ได้รับข้อมูลตอบกลับจากเซิร์ฟเวอร์",
+              timer: 2000
+            });
+            setIsLoading(false);
+            return;
+          }
+
+          if (res.success === true) {
+            setCandidateData(res.data);
+            setPaginationData(res.pagination);
+            if (res.counts) setStatusCounts(res.counts);
+            setLastUpdated(new Date());
+          } else {
+            Swal.fire({
+              icon: "warning",
+              title: "แจ้งเตือน",
+              text: res.message || "เกิดข้อผิดพลาดในการดึงข้อมูล",
+              timer: 2000
+            });
+          }
+          setIsLoading(false);
+        })
+        .withFailureHandler((err) => {
+          if (err) {
+            Swal.fire({ icon: "error", title: "เกิดข้อผิดพลาด", text: err.message, timer: 2000 });
+          }
+          setIsLoading(false);
+        })
+        .getQueueCandidates(query, userRole);
+    };
+
+    const fetchEventName = () => {
+      google.script.run
+        .withSuccessHandler((res) => setEvents(res))
+        .getEventNameDropdown(user.role);
+    };
+
+    useEffect(() => { fetchInterviewData(); }, [page, statusFilter, employeeCategory]);
+    useEffect(() => { fetchEventName(); }, []);
+
+    useEffect(() => {
+      const checkDateAndRefresh = () => {
+        const today = new Date().toDateString();
+        if (today !== currentDateRef.current) {
+          currentDateRef.current = today;
+          setSearch("");
+          setEventName("");
+          setPage(1);
+          fetchInterviewData();
+          return;
+        }
+
+        if (autoRefresh) {
+          fetchInterviewData();
+        }
+      };
+
+      if (autoRefresh) {
+        // เดิม: setInterval(checkDateAndRefresh, 20000) ยิงทุก 20s ตรงๆ
+        // ใหม่: หน่วง jitter สั้นๆ ก่อนเริ่ม interval (กันหลายเครื่อง refresh ชนกันพอดี)
+        // แล้วค่อยรันตาม AUTO_REFRESH_INTERVAL_MS — ฟังก์ชัน checkDateAndRefresh
+        // และเงื่อนไขข้างในไม่ถูกแก้ไขเลย
+        const startTimeout = setTimeout(() => {
+          intervalRef.current = setInterval(checkDateAndRefresh, AUTO_REFRESH_INTERVAL_MS);
+        }, AUTO_REFRESH_JITTER_MS);
+        return () => {
+          clearTimeout(startTimeout);
+          clearInterval(intervalRef.current);
+        };
+      } else {
+        intervalRef.current = setInterval(() => {
+          const today = new Date().toDateString();
+          if (today !== currentDateRef.current) {
+            currentDateRef.current = today;
+            setSearch("");
+            setEventName("");
+            setPage(1);
+            fetchInterviewData();
+          }
+        }, 60000);
+      }
+      return () => clearInterval(intervalRef.current);
+    }, [autoRefresh, search, eventName, page]);
+
+    const handlePageChange = (p) => { setPage(p); window.scrollTo(0, 0); };
+    const handleClear = () => { setSearch(""); setEventName(""); setStatusFilter("all"); setEmployeeCategory("all"); setPage(1); };
+    const handleSubmit = (e) => { e.preventDefault(); setPage(1); fetchInterviewData(); };
+    const handleStatusFilterChange = (value) => {
+      setStatusFilter(value);
+      setPage(1);
+    };
+    const handleEmployeeCategoryChange = (value) => {
+      setEmployeeCategory(value);
+      setPage(1);
+    };
+
+    const getCheckInStatus = (candidate) => {
+      const participation = String(candidate.Participation_Status || candidate.participationStatus || candidate.ParticipationStatus || "").trim();
+      const displayStatus = String(candidate.Queue_Display_Status || candidate.QueueDisplayStatus || "").trim();
+      const isCheckedIn = participation === "เข้าร่วม" || participation === "Walk-In" || displayStatus === "เช็คชื่อแล้ว";
+      return isCheckedIn ? "เช็คชื่อแล้ว" : "ไม่เข้าร่วม";
+    };
+
+    const getCheckInStatusStyle = (status) => {
+      switch (status) {
+        case "เช็คชื่อแล้ว":
+          return { bg: "#dcfce7", color: "#15803d", border: "#bbf7d0" };
+        case "ไม่เข้าร่วม":
+        default:
+          return { bg: "#fee2e2", color: "#991b1c", border: "#fecaca" };
+      }
+    };
+
+    const getQueueAdminStatus = (candidate) => {
+      return statusOverrides[candidate.Interview_Id] || String(candidate.Queue_Admin_Status || "").trim() || "ยังไม่สัมภาษณ์";
+    };
+
+    const getInterviewStatusStyle = (status) => {
+      switch (status) {
+        case "สัมภาษณ์แล้ว":
+          return { bg: "#dcfce7", color: "#0f766e", border: "#bbf7d0" };
+        case "ยังไม่สัมภาษณ์":
+        default:
+          return { bg: "#fee2e2", color: "#991b1c", border: "#fecaca" };
+      }
+    };
+
+    const handleToggleCheckIn = (candidate, nextStatus) => {
+      const currentStatus = getQueueAdminStatus(candidate);
+      if (currentStatus === nextStatus) return;
+
+      Swal.fire({
+        icon: "question",
+        title: `ยืนยันปรับสถานะเป็น "${nextStatus}"?`,
+        text: `สำหรับ ${candidate.Fullname || ""}`,
+        showCancelButton: true,
+        confirmButtonText: "ยืนยัน",
+        cancelButtonText: "ยกเลิก",
+        confirmButtonColor: "#059669",
+      }).then((result) => {
+        if (!result.isConfirmed) return;
+
+        const payload = {
+          interviewId: candidate.Interview_Id,
+          eventName: (candidate.eventDetail && candidate.eventDetail.Event_Name) || candidate.Event_Name || "",
+          candidateName: candidate.Fullname || candidate.Name || "",
+          status: nextStatus,
+        };
+
+        google.script.run
+          .withSuccessHandler((res) => {
+            if (res && res.success) {
+              setStatusOverrides((prev) => ({
+                ...prev,
+                [candidate.Interview_Id]: nextStatus,
+              }));
+              setCandidateData((prevData) => prevData.reduce((list, item) => {
+                if (item.Interview_Id !== candidate.Interview_Id) {
+                  list.push(item);
+                  return list;
+                }
+
+                const updatedItem = { ...item, Queue_Admin_Status: nextStatus };
+                const isFilterActive = statusFilter !== "all";
+                const matchesFilter = !isFilterActive ||
+                  (statusFilter === "ยังไม่สัมภาษณ์" && nextStatus === "ยังไม่สัมภาษณ์") ||
+                  (statusFilter === "สัมภาษณ์แล้ว" && nextStatus === "สัมภาษณ์แล้ว");
+
+                if (matchesFilter) {
+                  list.push(updatedItem);
+                }
+                return list;
+              }, []));
+
+              setStatusCounts((prev) => {
+                const nextCounts = { ...prev };
+                if (currentStatus === "ยังไม่สัมภาษณ์") {
+                  nextCounts.waiting = Math.max(0, (nextCounts.waiting || 0) - 1);
+                }
+                if (nextStatus === "ยังไม่สัมภาษณ์") {
+                  nextCounts.waiting = (nextCounts.waiting || 0) + 1;
+                }
+                if (currentStatus === "สัมภาษณ์แล้ว") {
+                  nextCounts.interviewed = Math.max(0, (nextCounts.interviewed || 0) - 1);
+                }
+                if (nextStatus === "สัมภาษณ์แล้ว") {
+                  nextCounts.interviewed = (nextCounts.interviewed || 0) + 1;
+                }
+                return nextCounts;
+              });
+
+              setIsSeeMoreDetail(null);
+              Swal.fire({
+                icon: "success",
+                title: `ปรับสถานะเป็น "${nextStatus}" เรียบร้อยแล้ว`,
+                timer: 1200,
+                showConfirmButton: false,
+              });
+            } else {
+              Swal.fire({
+                icon: "error",
+                title: res?.message || "ไม่สามารถบันทึกสถานะได้",
+                timer: 2000,
+              });
+            }
+          })
+          .withFailureHandler((err) => {
+            Swal.fire({
+              icon: "error",
+              title: "เกิดข้อผิดพลาด",
+              text: err?.message || "ไม่สามารถบันทึกสถานะได้",
+              timer: 2000,
+            });
+          })
+          .updateQueueAdminStatus(payload);
+      });
+    };
+
+    const getQueueDisplayStyle = (displayStatus) => {
+      switch (displayStatus) {
+        case "เช็คชื่อแล้ว": return { bg: "#dcfce7", color: "#15803d", border: "#bbf7d0" };
+        case "ไม่เข้าร่วม": return { bg: "#fee2e2", color: "#dc2626", border: "#fecaca" };
+        case "รอเช็คชื่อ":
+        default: return { bg: "#fef9c3", color: "#854d0e", border: "#fde047" };
+      }
+    };
+
+    const getTodayLabel = () => {
+      return new Date().toLocaleDateString("th-TH", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric"
+      });
+    };
+
+    const checkedInCount = statusCounts.checkedIn;
+    const pendingCount = statusCounts.waiting;
+    const notJoinedCount = statusCounts.absent;
+    const interviewedCount = statusCounts.interviewed;
+
+    if (!isSuperAdmin) {
+      return React.createElement(
+        "div", { className: "flex items-center justify-center h-64" },
+        React.createElement("div", { className: "text-center" },
+          React.createElement("i", { className: "fa-solid fa-lock text-4xl text-red-400 mb-4" }),
+          React.createElement("p", { className: "text-lg font-semibold text-red-500" }, "คุณไม่มีสิทธิ์เข้าถึงหน้านี้"),
+          React.createElement("p", { className: "text-sm text-gray-400 mt-1" }, "เฉพาะ SuperAdmin เท่านั้น")
+        )
+      );
+    }
+
+    const columns = [
+      { key: "no", label: "ลำดับคิว", width: 70, align: "center" },
+      { key: "name", label: "ชื่อ-นามสกุล", width: 170, align: "left" },
+      { key: "action", label: "สถานะสัมภาษณ์", width: 170, align: "center" },
+      { key: "role", label: "ตำแหน่งที่สมัคร", width: 170, align: "left" },
+      { key: "period", label: "ช่วงเวลาสัมภาษณ์", width: 130, align: "center" },
+      { key: "event", label: "อีเวนต์", width: 180, align: "left" },
+      { key: "status", label: "สถานะเช็คชื่อ", width: 150, align: "center" },
+      { key: "checkin", label: "เวลาเช็คชื่อ", width: 140, align: "center" },
+      { key: "checkedBy", label: "เจ้าหน้าที่เช็คชื่อ", width: 140, align: "left" },
+    ];
+
+    const ROW_H = 34;
+    const HEADER_H = 34;
+
+    return React.createElement("div", { className: "w-full max-w-7xl xl:max-w-[1600px] mx-auto pb-24 px-2 sm:px-4" },
+      React.createElement("div", { className: "flex flex-col md:flex-row justify-between items-start md:items-end mb-4 gap-3 animate-fade-in-up" },
+        React.createElement("div", {},
+          React.createElement(SystemHeader, {
+            title: "ระบบจัดการคิว",
+            subTitle: "ดูข้อมูลการเช็คชื่อและลำดับคิวของผู้สมัครแบบเรียลไทม์"
+          })
+        ),
+        React.createElement("div", { className: "flex items-center gap-2 flex-wrap" },
+          paginationData && paginationData.totalItems > 0 &&
+          React.createElement("span", { className: "text-xs text-emerald-700 bg-emerald-50 border border-emerald-100 px-3 py-1.5 rounded-md font-medium" },
+            "ทั้งหมด ", React.createElement("strong", {}, paginationData.totalItems), " รายการ"
+          ),
+          React.createElement("label", { className: "flex items-center gap-1.5 text-xs bg-blue-50 border border-blue-100 text-blue-600 px-2.5 py-1.5 rounded-md cursor-pointer select-none" },
+            React.createElement("input", {
+              type: "checkbox",
+              className: "toggle toggle-info toggle-xs",
+              checked: autoRefresh,
+              onChange: (e) => setAutoRefresh(e.target.checked)
+            }),
+            "Auto (35s)"
+          ),
+          lastUpdated && React.createElement("span", { className: "text-xs text-slate-400" },
+            "อัพเดต: " + lastUpdated.toLocaleTimeString("th-TH")
+          )
+        )
+      ),
+
+      !eventName && React.createElement("div", {
+        className: "flex items-center gap-2 bg-sky-50 text-sky-700 border border-sky-100 px-4 py-2 rounded-lg text-xs sm:text-sm mb-3 animate-fade-in-up"
+      },
+        React.createElement("i", { className: "fa-regular fa-calendar" }),
+        `กำลังแสดงคิวของวันที่ ${getTodayLabel()} เท่านั้น — เลือก Event ด้านล่างเพื่อดูคิวย้อนหลังของ Event นั้น`
+      ),
+
+      React.createElement("div", { className: "grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4" },
+        ...[
+          { icon: "fa-user-check", label: "เช็คชื่อแล้ว", value: checkedInCount, color: "sky", filterValue: "เช็คชื่อแล้ว" },
+          { icon: "fa-clock", label: "คนที่ยังไม่ได้เรียกสัมภาษณ์", value: pendingCount, color: "amber", filterValue: "ยังไม่สัมภาษณ์" },
+          { icon: "fa-circle-check", label: "สัมภาษณ์แล้ว", value: interviewedCount, color: "emerald", filterValue: "สัมภาษณ์แล้ว" },
+          { icon: "fa-circle-xmark", label: "ไม่เข้าร่วม", value: notJoinedCount, color: "red", filterValue: "ไม่เข้าร่วม" },
+        ].map((k) => {
+          const isActive = statusFilter === k.filterValue;
+          return React.createElement("button", {
+            key: k.label,
+            type: "button",
+            onClick: () => handleStatusFilterChange(k.filterValue),
+            className: `text-left bg-${k.color}-50 border ${isActive ? `border-${k.color}-400 ring-2 ring-${k.color}-200` : `border-${k.color}-100`} rounded-lg p-3 flex items-center gap-2 transition-all hover:shadow-sm cursor-pointer`
+          },
+            React.createElement("i", { className: `fa-solid ${k.icon} text-${k.color}-500 text-base` }),
+            React.createElement("div", {},
+              React.createElement("p", { className: `text-[10px] text-${k.color}-500 leading-none mb-0.5` }, k.label),
+              React.createElement("p", { className: `text-lg font-bold text-${k.color}-700 leading-tight truncate max-w-[100px]` }, k.value)
+            )
+          );
+        })
+      ),
+
+      React.createElement("form", { onSubmit: handleSubmit, className: "bg-white border border-gray-200 rounded-lg p-3 mb-3 shadow-sm animate-fade-in-up" },
+        React.createElement("div", { className: "flex flex-col lg:flex-row gap-3 items-end" },
+          React.createElement("div", { className: "w-full lg:flex-[2]" },
+            React.createElement("label", { className: "text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-1 block" }, "ค้นหา"),
+            React.createElement(InputField, {
+              name: "search", type: "text", value: search,
+              onChange: (e) => setSearch(e.target.value),
+              placeholder: "🔍 ชื่อผู้สมัคร...", className: "w-full h-8 text-sm"
+            })
+          ),
+          React.createElement("div", { className: "w-full lg:flex-[4] grid grid-cols-1 sm:grid-cols-3 gap-3" },
+            React.createElement("div", { className: "w-full" },
+              React.createElement("label", { className: "text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-1 block" }, "อีเวนต์"),
+              React.createElement("div", { style: { position: "relative", zIndex: 30 } },
+                React.createElement(SearchableSelect, {
+                  name: "eventName", value: eventName || "",
+                  onChange: (e) => setEventName(e.target.value),
+                  options: events, placeholder: "ทั้งหมด"
+                })
+              )
+            ),
+            React.createElement("div", { className: "w-full" },
+              React.createElement("label", { className: "text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-1 block" }, "สถานะการสัมภาษณ์"),
+              React.createElement("select", {
+                className: "select select-bordered w-full h-8 min-h-0 text-sm",
+                value: statusFilter,
+                onChange: (e) => handleStatusFilterChange(e.target.value)
+              },
+                CHECKIN_STATUS_OPTIONS.map((opt) =>
+                  React.createElement("option", { key: opt.value, value: opt.value }, opt.label)
+                )
+              )
+            ),
+            React.createElement("div", { className: "w-full" },
+              React.createElement("label", { className: "text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-1 block" }, "ประเภทพนักงาน"),
+              React.createElement("select", {
+                className: "select select-bordered w-full h-8 min-h-0 text-sm",
+                value: employeeCategory,
+                onChange: (e) => handleEmployeeCategoryChange(e.target.value)
+              },
+                EMPLOYEE_CATEGORY_OPTIONS.map((opt) =>
+                  React.createElement("option", { key: opt.value, value: opt.value }, opt.label)
+                )
+              )
+            )
+          ),
+          React.createElement("div", { className: "flex gap-2 shrink-0" },
+            React.createElement("button", {
+              type: "button", onClick: handleClear,
+              className: "btn btn-ghost btn-sm text-gray-400 border border-gray-200 h-8 min-h-0",
+              disabled: isLoading
+            }, "ล้าง"),
+            React.createElement("button", {
+              type: "submit",
+              className: "btn btn-sm bg-emerald-600 hover:bg-emerald-700 text-white border-none h-8 min-h-0 px-5 gap-1.5",
+              disabled: isLoading
+            }, React.createElement("i", { className: "fa-solid fa-magnifying-glass text-xs" }), "ค้นหา")
+          )
+        )
+      ),
+
+      isLoading
+        ? React.createElement("div", { className: "w-full py-20 flex flex-col items-center justify-center text-slate-400 gap-3" },
+          React.createElement("span", { className: "loading loading-dots loading-lg text-emerald-500" }),
+          React.createElement("p", { className: "text-sm font-light" }, "กำลังโหลดข้อมูล...")
+        )
+        : React.createElement("div", { className: "animate-fade-in-up" },
+          candidateData.length > 0
+            ? React.createElement("div", {},
+              React.createElement("div", {
+                style: {
+                  overflowX: "auto",
+                  border: "1px solid #d1d5db",
+                  borderRadius: "6px",
+                  background: "#fff",
+                  boxShadow: "0 1px 3px rgba(0,0,0,0.07)"
+                }
+              },
+                React.createElement("table", {
+                  style: {
+                    borderCollapse: "collapse",
+                    width: "100%",
+                    minWidth: columns.reduce((s, c) => s + c.width, 0) + "px",
+                    fontFamily: "'Google Sans', 'Prompt', Arial, sans-serif",
+                    fontSize: "12px"
+                  }
+                },
+                  React.createElement("thead", {},
+                    React.createElement("tr", {},
+                      React.createElement("th", {
+                        style: {
+                          width: "36px", minWidth: "36px",
+                          background: "#f8f9fa", borderRight: "1px solid #d1d5db",
+                          borderBottom: "2px solid #c9ccd0",
+                          padding: "0 6px", height: HEADER_H + "px",
+                          textAlign: "center", color: "#5f6368",
+                          fontSize: "11px", fontWeight: 500,
+                          position: "sticky", left: 0, zIndex: 2
+                        }
+                      }, "ลำดับที่"),
+                      columns.map((col) =>
+                        React.createElement("th", {
+                          key: col.key,
+                          style: {
+                            width: col.width + "px", minWidth: col.width + "px",
+                            background: "#f8f9fa",
+                            borderRight: "1px solid #e2e8f0",
+                            borderBottom: "2px solid #c9ccd0",
+                            padding: "0 8px", height: HEADER_H + "px",
+                            textAlign: col.align === "center" ? "center" : "left",
+                            color: "#3c4043",
+                            fontWeight: 600, fontSize: "11px",
+                            whiteSpace: "nowrap",
+                            userSelect: "none"
+                          }
+                        }, col.label)
+                      )
+                    )
+                  ),
+                  React.createElement("tbody", {},
+                    candidateData.map((candidate, idx) => {
+                      const {
+                        Interview_Id, Fullname, Position_Applied,
+                        Interview_Period, joinedAt, approvedBy,
+                        CheckIn_Time, Approved_By, Queue_Display_Status,
+                        Queue_Admin_Status, Employee_Category, Position_Type, Participation_Status
+                      } = candidate;
+                      const { Event_Name } = candidate.eventDetail || {};
+                      const rowNum = (page - 1) * limit + idx + 1;
+                      const isEven = idx % 2 === 0;
+                      const checkInStatus = getCheckInStatus(candidate);
+                      const checkInStatusStyle = getCheckInStatusStyle(checkInStatus);
+                      const interviewStatus = getQueueAdminStatus(candidate);
+                      const interviewStatusStyle = getInterviewStatusStyle(interviewStatus);
+
+                      const isInterviewed = interviewStatus === "สัมภาษณ์แล้ว";
+                      const isNotJoined = checkInStatus === "ไม่เข้าร่วม";
+
+                      const displayCheckInTime = joinedAt || CheckIn_Time || candidate.Check_In_Time || candidate.checkInTime || "-";
+                      const displayApprovedBy = approvedBy || Approved_By || candidate.Approved_By || candidate.Checked_By || "-";
+                      const rowBaseBg = isInterviewed ? "#f0fdf4" : (isNotJoined ? "#fef2f2" : (isEven ? "#ffffff" : "#f8fafc"));
+                      const isRowToggling = togglingId === Interview_Id;
+
+                      return React.createElement("tr", {
+                        key: Interview_Id,
+                        onClick: () => {
+                          setIsSeeMoreDetail({
+                            ...candidate,
+                            indexNum: rowNum,
+                            joinedAt: displayCheckInTime,
+                            approvedBy: displayApprovedBy,
+                            Queue_Admin_Status: getQueueAdminStatus(candidate)
+                          });
+                        },
+                        onMouseEnter: (e) => { e.currentTarget.style.background = "#e8f5e9"; },
+                        onMouseLeave: (e) => { e.currentTarget.style.background = rowBaseBg; },
+                        style: { background: rowBaseBg, cursor: "pointer" }
+                      },
+                        React.createElement("td", {
+                          style: {
+                            width: "36px", minWidth: "36px",
+                            borderRight: "1px solid #e2e8f0",
+                            borderBottom: "1px solid #e2e8f0",
+                            padding: "0 6px", height: ROW_H + "px",
+                            textAlign: "center", color: "#9ca3af",
+                            fontSize: "10px", fontWeight: 400,
+                            background: "inherit",
+                            position: "sticky", left: 0
+                          }
+                        }, rowNum),
+                        // ลำดับคิว
+                        React.createElement("td", {
+                          style: { width: "70px", minWidth: "70px", borderRight: "1px solid #e2e8f0", borderBottom: "1px solid #e2e8f0", padding: "0 8px", height: ROW_H + "px", textAlign: "center" }
+                        },
+                          React.createElement("span", {
+                            style: {
+                              display: "inline-flex", alignItems: "center", justifyContent: "center",
+                              width: "28px", height: "22px",
+                              background: isInterviewed ? "#059669" : (isNotJoined ? "#dc2626" : "#ca8a04"),
+                              color: "#fff", borderRadius: "4px", fontSize: "12px", fontWeight: 700
+                            }
+                          }, candidate.queueNo || candidate.Queue_No || candidate.No || "-")
+                        ),
+                        // ชื่อ-นามสกุล
+                        React.createElement("td", {
+                          style: { width: "170px", minWidth: "170px", borderRight: "1px solid #e2e8f0", borderBottom: "1px solid #e2e8f0", padding: "0 8px", height: ROW_H + "px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: "#111827", fontWeight: 500, fontSize: "12px" }
+                        }, Fullname || "-"),
+                        // สถานะสัมภาษณ์
+                        React.createElement("td", {
+                          style: { width: "170px", minWidth: "170px", borderRight: "1px solid #e2e8f0", borderBottom: "1px solid #e2e8f0", padding: "4px 8px", height: ROW_H + "px", textAlign: "center" },
+                          onClick: (e) => e.stopPropagation()
+                        },
+                          React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "center", gap: "8px" } },
+                            React.createElement("span", {
+                              style: {
+                                display: "inline-flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                padding: "4px 10px",
+                                borderRadius: "999px",
+                                background: interviewStatusStyle.bg,
+                                color: interviewStatusStyle.color,
+                                border: `1px solid ${interviewStatusStyle.border}`,
+                                fontSize: "11px",
+                                fontWeight: 600,
+                                whiteSpace: "nowrap",
+                              }
+                            }, interviewStatus),
+                            isRowToggling && React.createElement("span", { className: "loading loading-spinner loading-xs text-emerald-500" })
+                          )
+                        ),
+                        // ตำแหน่งที่สมัคร
+                        React.createElement("td", {
+                          style: { width: "170px", minWidth: "170px", borderRight: "1px solid #e2e8f0", borderBottom: "1px solid #e2e8f0", padding: "0 8px", height: ROW_H + "px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: "#374151", fontSize: "11px" }
+                        }, Position_Applied || "-"),
+                        // ช่วงเวลาสัมภาษณ์
+                        React.createElement("td", {
+                          style: { width: "130px", minWidth: "130px", borderRight: "1px solid #e2e8f0", borderBottom: "1px solid #e2e8f0", padding: "0 8px", height: ROW_H + "px", textAlign: "center", whiteSpace: "nowrap", color: "#374151", fontSize: "11px" }
+                        }, Interview_Period || React.createElement("span", { style: { color: "#d1d5db" } }, "-")),
+                        // อีเวนต์
+                        React.createElement("td", {
+                          style: { width: "180px", minWidth: "180px", borderRight: "1px solid #e2e8f0", borderBottom: "1px solid #e2e8f0", padding: "0 8px", height: ROW_H + "px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: "#374151", fontSize: "12px" }
+                        }, Event_Name || "-"),
+                        // สถานะเช็คชื่อ
+                        React.createElement("td", {
+                          style: { width: "150px", minWidth: "150px", borderRight: "1px solid #e2e8f0", borderBottom: "1px solid #e2e8f0", padding: "0 8px", height: ROW_H + "px", textAlign: "center" }
+                        },
+                          React.createElement("span", {
+                            style: {
+                              display: "inline-flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              padding: "4px 10px",
+                              borderRadius: "999px",
+                              background: checkInStatusStyle.bg,
+                              color: checkInStatusStyle.color,
+                              border: `1px solid ${checkInStatusStyle.border}`,
+                              fontSize: "11px",
+                              fontWeight: 600,
+                              whiteSpace: "nowrap",
+                            }
+                          }, checkInStatus)
+                        ),
+                        // เวลาเช็คชื่อ
+                        React.createElement("td", {
+                          style: { width: "140px", minWidth: "140px", borderRight: "1px solid #e2e8f0", borderBottom: "1px solid #e2e8f0", padding: "0 8px", height: ROW_H + "px", textAlign: "center", whiteSpace: "nowrap", color: displayCheckInTime !== "-" ? "#059669" : "#d1d5db", fontWeight: displayCheckInTime !== "-" ? 600 : 400, fontSize: "11px" }
+                        }, displayCheckInTime),
+                        // เจ้าหน้าที่เช็คชื่อ
+                        React.createElement("td", {
+                          style: { width: "140px", minWidth: "140px", borderRight: "1px solid #e2e8f0", borderBottom: "1px solid #e2e8f0", padding: "0 8px", height: ROW_H + "px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: displayApprovedBy !== "-" ? "#374151" : "#d1d5db", fontSize: "11px" }
+                        },
+                          displayApprovedBy !== "-"
+                            ? React.createElement("span", { style: { display: "flex", alignItems: "center", gap: "4px" } },
+                              React.createElement("i", { className: "fa-solid fa-user-check", style: { color: "#059669", fontSize: "10px" } }),
+                              displayApprovedBy
+                            )
+                            : "-"
+                        )
+                      );
+                    })
+                  )
+                )
+              ),
+              React.createElement("div", { className: "mt-4 flex justify-between items-center px-1" },
+                React.createElement("p", { className: "text-xs text-gray-400" },
+                  "แสดง " + ((page - 1) * limit + 1) + "–" + Math.min(page * limit, paginationData.totalItems || 0) + " จาก " + (paginationData.totalItems || 0) + " รายการ"
+                ),
+                React.createElement(PagePagination, {
+                  currentPage: paginationData.currentPage || 1,
+                  totalPages: paginationData.totalPages || 1,
+                  onPageChange: handlePageChange
+                })
+              )
+            )
+            : React.createElement("div", { className: "w-full py-16 flex flex-col items-center justify-center border-2 border-dashed border-slate-200 rounded-xl bg-slate-50/50" },
+              React.createElement("div", { className: "text-4xl mb-2" }, "📋"),
+              React.createElement("p", { className: "text-gray-500 font-medium" }, "ไม่พบข้อมูลผู้สมัคร"),
+              React.createElement("p", { className: "text-slate-400 text-sm mt-1" }, "ลองปรับเปลี่ยนคำค้นหาหรือตัวกรองใหม่อีกครั้ง")
+            )
+        ),
+
+      React.createElement(QueueDetailModal, {
+        interview: isSeeMoreDetail,
+        isOpen: !!isSeeMoreDetail,
+        onClose: () => setIsSeeMoreDetail(null),
+        onToggleCheckIn: handleToggleCheckIn,
+        isToggling: isSeeMoreDetail && togglingId === isSeeMoreDetail.Interview_Id
+      })
+    );
+  };
+</script>

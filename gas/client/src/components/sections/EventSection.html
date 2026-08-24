@@ -1,0 +1,73 @@
+<script type="text/javascript">var {
+  useState,
+  useEffect
+} = React;
+var {
+  useHistory
+} = ReactRouterDOM;
+var EventSection = ({
+  user
+}) => {
+  const [eventPage, setEventPage] = useState(1);
+  const [limit] = useState(6);
+  const [events, setEvents] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const history = useHistory();
+  const getEvents = () => {
+    setIsLoading(true);
+    const query = {
+      page: eventPage,
+      limit
+    };
+    const userRole = user ? user.role : "USER";
+    google.script.run.withSuccessHandler(res => {
+      if (res.success === true) {
+        setEvents(res.data);
+      }
+      setIsLoading(false);
+    }).withFailureHandler(err => {
+      if (err) {
+        Swal.fire({
+          icon: "error",
+          title: "เกิดข้อผิดพลาด",
+          text: err.message,
+          timer: 2000
+        });
+      }
+      setIsLoading(false);
+    }).getEventsData(query, userRole);
+  };
+  useEffect(() => {
+    getEvents();
+  }, [eventPage]);
+  return /*#__PURE__*/React.createElement("div", {
+    className: "padding-container py-24 w-full space-y-6"
+  }, /*#__PURE__*/React.createElement(Header, {
+    title: "\u0E2D\u0E35\u0E40\u0E27\u0E19\u0E15\u0E4C\u0E2A\u0E31\u0E21\u0E20\u0E32\u0E29\u0E13\u0E4C",
+    subTitle: "\u0E40\u0E25\u0E37\u0E2D\u0E01\u0E2D\u0E35\u0E40\u0E27\u0E19\u0E15\u0E4C\u0E2A\u0E31\u0E21\u0E20\u0E32\u0E29\u0E13\u0E4C\u0E17\u0E35\u0E48\u0E04\u0E38\u0E13\u0E15\u0E49\u0E2D\u0E07\u0E01\u0E32\u0E23\u0E40\u0E02\u0E49\u0E32\u0E23\u0E48\u0E27\u0E21"
+  }), isLoading ? /*#__PURE__*/React.createElement("div", {
+    className: "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-fade-in-up"
+  }, [...Array(3)].map((_, i) => /*#__PURE__*/React.createElement("div", {
+    key: i,
+    className: "flex flex-col gap-4 w-full"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "skeleton h-48 w-full rounded-xl"
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "skeleton h-4 w-28"
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "skeleton h-4 w-full"
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "skeleton h-4 w-full"
+  })))) : /*#__PURE__*/React.createElement("div", {
+    className: "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 mt-18 xl:px-20 animate-fade-in-up"
+  }, /*#__PURE__*/React.createElement(EventCards, {
+    events: events
+  })), /*#__PURE__*/React.createElement("div", {
+    className: "w-full mt-16 flex justify-center animate-fade-in-up"
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: () => history.push("/events"),
+    className: "btn btn-outline flex items-center gap-2 border-neutral-content font-normal"
+  }, /*#__PURE__*/React.createElement("p", null, "\u0E2D\u0E35\u0E40\u0E27\u0E19\u0E15\u0E4C\u0E17\u0E31\u0E49\u0E07\u0E2B\u0E21\u0E14"), /*#__PURE__*/React.createElement("i", {
+    className: "fa-solid fa-arrow-right"
+  }))));
+};</script>

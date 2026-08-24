@@ -1,0 +1,22 @@
+<script type="text/javascript">var PagePagination = ({
+  currentPage,
+  totalPages,
+  onPageChange
+}) => {
+  if (totalPages <= 1) return null;
+  return /*#__PURE__*/React.createElement("div", {
+    className: "flex justify-center mt-8"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "join"
+  }, /*#__PURE__*/React.createElement("button", {
+    className: "join-item btn btn-sm",
+    disabled: currentPage === 1,
+    onClick: () => onPageChange(currentPage - 1)
+  }, "\xAB"), /*#__PURE__*/React.createElement("button", {
+    className: "join-item btn btn-sm no-animation bg-base-100 cursor-default"
+  }, "\u0E2B\u0E19\u0E49\u0E32 ", currentPage, " / ", totalPages), /*#__PURE__*/React.createElement("button", {
+    className: "join-item btn btn-sm",
+    disabled: currentPage === totalPages,
+    onClick: () => onPageChange(currentPage + 1)
+  }, "\xBB")));
+};</script>

@@ -1,0 +1,66 @@
+<script type="text/javascript">var {
+  useState,
+  useEffect
+} = React;
+var ManageJobHiringPage = () => {
+  const [images, setImages] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [openAddModal, setOpenAddModal] = useState(false);
+  const fetchImages = () => {
+    setIsLoading(true);
+    google.script.run.withSuccessHandler(res => {
+      if (res) {
+        setImages(res);
+        setIsLoading(false);
+      } else {
+        setImages([]);
+        setIsLoading(false);
+      }
+    }).getAllJobHiringPosterUrl();
+  };
+  useEffect(() => {
+    fetchImages();
+  }, []);
+  return /*#__PURE__*/React.createElement("div", {
+    className: "w-full max-w-7xl xl:max-w-[1440px] mx-auto pb-24"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex flex-col sm:flex-row items-center justify-center sm:justify-between gap-6 mb-8 animate-fade-in-up"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex flex-col text-center sm:text-start"
+  }, /*#__PURE__*/React.createElement(SystemHeader, {
+    title: "\u0E08\u0E31\u0E14\u0E01\u0E32\u0E23\u0E15\u0E33\u0E41\u0E2B\u0E19\u0E48\u0E07\u0E07\u0E32\u0E19\u0E27\u0E48\u0E32\u0E07",
+    subTitle: "\u0E15\u0E23\u0E27\u0E08\u0E2A\u0E2D\u0E1A\u0E41\u0E25\u0E30\u0E41\u0E01\u0E49\u0E44\u0E02\u0E02\u0E49\u0E2D\u0E21\u0E39\u0E25\u0E15\u0E33\u0E41\u0E2B\u0E19\u0E48\u0E07\u0E07\u0E32\u0E19\u0E27\u0E48\u0E32\u0E07\u0E43\u0E19\u0E23\u0E30\u0E1A\u0E1A"
+  })), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setOpenAddModal(true),
+    className: "btn bg-emerald-600 hover:bg-emerald-500 text-white  hover:scale-110 duration-300 transition-all"
+  }, "\u0E40\u0E1E\u0E34\u0E48\u0E21\u0E23\u0E39\u0E1B\u0E20\u0E32\u0E1E")), isLoading ? /*#__PURE__*/React.createElement("div", {
+    className: "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-fade-in-up"
+  }, [...Array(3)].map((_, i) => /*#__PURE__*/React.createElement("div", {
+    key: i,
+    className: "flex flex-col gap-4 w-full animate-pulse"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "skeleton h-48 w-full rounded-xl"
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "skeleton h-4 w-28"
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "skeleton h-4 w-full"
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "skeleton h-4 w-full"
+  })))) : images.length > 0 ? /*#__PURE__*/React.createElement("div", {
+    className: "w-full animate-fade-in-up"
+  }, /*#__PURE__*/React.createElement(PreviewJobHiring, {
+    images: images,
+    onRefresh: fetchImages
+  })) : /*#__PURE__*/React.createElement("div", {
+    className: "animate-fade-in-up"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "w-full py-16 flex flex-col items-center justify-center border-2 border-dashed border-slate-200 rounded-2xl bg-slate-50/50"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "text-4xl mb-2"
+  }, "\uD83D\uDDBC\uFE0F"), /*#__PURE__*/React.createElement("p", {
+    className: "text-gray-500 font-medium"
+  }, "\u0E44\u0E21\u0E48\u0E1E\u0E1A\u0E23\u0E39\u0E1B\u0E20\u0E32\u0E1E"))), openAddModal && /*#__PURE__*/React.createElement(AddJobHiringModal, {
+    onClose: () => setOpenAddModal(false),
+    onRefresh: fetchImages
+  }));
+};</script>

@@ -1,0 +1,40 @@
+<script type="text/javascript">var SelectField = ({
+  label,
+  name,
+  value,
+  onChange,
+  options,
+  colSpan = 1,
+  required = false,
+  disabled = false
+}) => {
+  const getColSpanClass = span => {
+    const classMap = {
+      1: "col-span-1 lg:col-span-1",
+      2: "col-span-1 lg:col-span-2",
+      3: "col-span-1 lg:col-span-3",
+      4: "col-span-1 lg:col-span-4"
+    };
+    return classMap[span] || "col-span-1 lg:col-span-1";
+  };
+  return /*#__PURE__*/React.createElement("div", {
+    className: `form-control w-full ${getColSpanClass(colSpan)}`
+  }, /*#__PURE__*/React.createElement("label", {
+    className: "text-gray-500 text-sm"
+  }, label, " ", required && /*#__PURE__*/React.createElement("span", {
+    className: "text-error"
+  }, "*")), /*#__PURE__*/React.createElement("select", {
+    name: name,
+    value: value,
+    onChange: onChange,
+    required: required,
+    disabled: disabled,
+    className: "select select-bordered w-full focus:select-primary"
+  }, /*#__PURE__*/React.createElement("option", {
+    value: "",
+    disabled: true
+  }, "-- \u0E01\u0E23\u0E38\u0E13\u0E32\u0E40\u0E25\u0E37\u0E2D\u0E01 --"), options.map((opt, idx) => /*#__PURE__*/React.createElement("option", {
+    key: idx,
+    value: opt
+  }, opt))));
+};</script>
